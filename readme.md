@@ -24,6 +24,9 @@ const ws = new WebSocket('ws://localhost:3333');
 - all subscribed users are notified that the new user has joined the lobby.
 
 ```ts
+// server.ts
+// @see https://bun.sh/docs/api/websockets
+
 // `ws` here is the WebSocket connection to the client who just connected
 // `server` can be used to publish messages to all connected clients
 
