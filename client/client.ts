@@ -45,6 +45,7 @@ ws.onmessage = async (event) => {
       return;
     }
     case 'peer-offer': {
+      if (message.toId !== selfId) return; // TEMPORARY. todo: handle this server-side by putting each user into a channel keyed on their id
       const li = document.querySelector(`li[data-id="${message.fromId}"]`);
       if (!li) return;
       const button = li.querySelector('button')!;
