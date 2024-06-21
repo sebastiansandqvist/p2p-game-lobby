@@ -13,10 +13,15 @@ const lobby: User[] = [];
 
 const server = Bun.serve<User>({
   fetch(req, server) {
+    // a health check endpoint for zero-downtime deploys
+    if (req.url === '/healthz') return new Response('ok');
+
+    // all other requests are websocket connections
     const ip = server.requestIP(req) ?? { address: 'anonymous' };
     const id = [req.headers.get('sec-websocket-key'), ip.address].join('--');
     const websocketUpgradeSucceeded = server.upgrade(req, { data: { id } });
     if (websocketUpgradeSucceeded) return;
+
     return new Response('this server only handles websocket connections.');
   },
   websocket: {
