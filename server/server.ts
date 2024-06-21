@@ -21,12 +21,28 @@ const server = Bun.serve<User>({
     open(ws) {
       lobby.push(ws.data);
       console.log(`${ws.data.id} connected`);
+      // 1. tell the new client that they're connected
+      {
+        const message: Message = { kind: 'self-connected', id: ws.data.id };
+        ws.send(JSON.stringify(message));
+      }
+
+      // 2. tell the new client who else is in the lobby
       for (const { id } of lobby) {
         const message: Message = { kind: 'connected', id };
         ws.send(JSON.stringify(message));
       }
-      server.publish('lobby', JSON.stringify({ kind: 'connected', id: ws.data.id }));
+
+      // 3. tell everyone else in the lobby that a new client has joined
+      {
+        const message: Message = { kind: 'connected', id: ws.data.id };
+        server.publish('lobby', JSON.stringify(message));
+      }
+
+      // 4. subscribe the new client to all new lobby messages
       ws.subscribe('lobby');
+      // without this, all requests get sent to all users in the lobby
+      // ws.subscribe(ws.data.id); // subscribe to your own id so that others can send you direct messages?
     },
     message(ws, rawMessage) {
       if (typeof rawMessage !== 'string') return;
@@ -35,7 +51,7 @@ const server = Bun.serve<User>({
         const message = messageSchema.parse(messageJson);
         console.log(`received from ${ws.data.id}:`);
         console.log(message);
-        ws.publish('lobby', rawMessage);
+        server.publish('lobby', rawMessage);
       } catch (err) {
         console.error(err);
       }
@@ -44,7 +60,8 @@ const server = Bun.serve<User>({
       console.log(`${ws.data.id} disconnected.`);
       const index = lobby.findIndex((user) => user.id === ws.data.id);
       if (index !== -1) lobby.splice(index, 1);
-      server.publish('lobby', JSON.stringify({ kind: 'disconnected', id: ws.data.id }));
+      const message: Message = { kind: 'disconnected', id: ws.data.id };
+      server.publish('lobby', JSON.stringify(message));
     },
   },
   port: 3333,
