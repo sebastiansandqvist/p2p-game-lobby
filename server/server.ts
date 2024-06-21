@@ -15,7 +15,6 @@ const server = Bun.serve<User>({
   fetch(req, server) {
     // a health check endpoint for zero-downtime deploys
     const url = new URL(req.url);
-    console.log(url.pathname);
     if (url.pathname === '/healthz') return new Response('ok');
 
     // all other requests are websocket connections
@@ -80,5 +79,5 @@ const server = Bun.serve<User>({
       server.publish('lobby', JSON.stringify(message));
     },
   },
-  port: 3333,
+  port: process.env.PORT ?? 3333,
 });
