@@ -14,6 +14,7 @@ const lobby: User[] = [];
 const server = Bun.serve<User>({
   fetch(req, server) {
     // a health check endpoint for zero-downtime deploys
+    console.log(req.url);
     if (req.url === '/healthz') return new Response('ok');
 
     // all other requests are websocket connections
