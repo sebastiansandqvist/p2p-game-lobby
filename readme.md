@@ -23,6 +23,25 @@ const ws = new WebSocket('ws://localhost:3333');
 - the user is subscribed to a "lobby" channel in the websocket server so that they can get updated when other users join or leave the lobby.
 - all subscribed users are notified that the new user has joined the lobby.
 
+```ts
+// `ws` here is the WebSocket connection to the client who just connected
+// `server` can be used to publish messages to all connected clients
+
+// 1. tell the new client that they're connected
+ws.send(JSON.stringify({ kind: 'self-connected', id: ws.data.id }));
+
+// 2. tell the new client who else is in the lobby
+for (const user of lobby) {
+  ws.send(JSON.stringify({ kind: 'connected', id: user.id }));
+}
+
+// 3. tell everyone else in the lobby that a new client has joined
+server.publish('lobby', JSON.stringify({ kind: 'connected', id: ws.data.id }));
+
+// 4. subscribe the new client to all new lobby messages
+ws.subscribe('lobby');
+```
+
 3. given the up-to-date list of users in the lobby, the client can click the "request" button to request to make a p2p connection with any other user. this offer request is still handled on the websocket server. but the "offer" that is being transmitted contains all the data that the other uesr needs in order to establish a direct p2p connection.
 
 ```ts
