@@ -7,12 +7,14 @@ import { messageSchema, type Message } from '../types';
 type User = { id: string };
 
 // future: support multiple lobbies by request url
+// const lobbies = new Map<string, User[]>();
+
 const lobby: User[] = [];
 
 const server = Bun.serve<User>({
   fetch(req, server) {
-    const ip = server.requestIP(req);
-    const id = [req.headers.get('sec-websocket-key'), ip?.address].join('--');
+    const ip = server.requestIP(req) ?? { address: 'anonymous' };
+    const id = [req.headers.get('sec-websocket-key'), ip.address].join('--');
     const websocketUpgradeSucceeded = server.upgrade(req, { data: { id } });
     if (websocketUpgradeSucceeded) return;
     return new Response('this server only handles websocket connections.');
@@ -41,6 +43,13 @@ const server = Bun.serve<User>({
 
       // 4. subscribe the new client to all new lobby messages
       ws.subscribe('lobby');
+
+      // IDEA:
+      // support "I'll play anyone" mode by having the client transmit
+      // an offer to ALL connected clients. (basically what we currently
+      // do, minus the client-side filtering by id) but also allow the client
+      // to specify which user(s) they want to send offers to directly.
+
       // without this, all requests get sent to all users in the lobby
       // ws.subscribe(ws.data.id); // subscribe to your own id so that others can send you direct messages?
     },

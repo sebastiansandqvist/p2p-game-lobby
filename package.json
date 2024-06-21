@@ -1,8 +1,8 @@
 {
   "name": "peer-to-peer",
   "scripts": {
-    "dev:server": "bun --watch run ./server/server.ts ",
-    "start:server": "bun run ./server/server.ts ",
+    "dev:server": "bun --watch run ./server/server.ts",
+    "start:server": "bun run ./server/server.ts",
     "build:client": "bun build ./client/client.ts --outdir ./client",
     "dev:client": "bun build --watch ./client/client.ts --outdir ./client"
   },

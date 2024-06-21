@@ -1,0 +1,13 @@
+services:
+  - type: web
+    runtime: node
+    name: p2p-game-lobby
+    buildCommand: bun i
+    envVars:
+      - key: NODE_VERSION
+        value: 22.3.0
+    healthCheckPath: /healthz
+    plan: starter
+    pullRequestPreviewsEnabled: false
+    region: oregon
+    startCommand: bun run start:server
