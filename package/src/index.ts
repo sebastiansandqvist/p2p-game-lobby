@@ -1,5 +1,7 @@
 import { messageSchema, type Message } from './types';
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** returns a cleanup function */
 export function createPeerToPeer({
   websocketServerUrl,
@@ -20,7 +22,15 @@ export function createPeerToPeer({
   /** called when another user has sent a p2p connection offer to the current user */
   onPeerOffer?: ({ peerId, sendAnswer }: { peerId: string; sendAnswer: () => Promise<void> }) => void;
   /** called when another user has sent a p2p connection answer to the current user */
-  onPeerAnswer?: (peerId: string) => void;
+  onPeerAnswer?: ({
+    peerId,
+    channel,
+    sendMessage,
+  }: {
+    peerId: string;
+    channel: RTCDataChannel;
+    sendMessage: (message: string) => void;
+  }) => void;
 }) {
   const peerConnection = new RTCPeerConnection();
   const ws = new WebSocket(websocketServerUrl);
@@ -55,6 +65,7 @@ export function createPeerToPeer({
         return onPeerConnected?.({
           peerId: message.id,
           async sendOffer() {
+            console.log('sendOffer', peerConnection.signalingState, message.id);
             const offerMessage: Message = {
               kind: 'peer-offer',
               toId: message.id,
@@ -76,6 +87,7 @@ export function createPeerToPeer({
         return onPeerOffer?.({
           peerId: message.fromId,
           async sendAnswer() {
+            console.log('sendAnswer', peerConnection.signalingState, message.fromId);
             const answerMessage: Message = {
               kind: 'peer-answer',
               toId: message.fromId,
@@ -87,8 +99,14 @@ export function createPeerToPeer({
         });
       }
       case 'peer-answer': {
+        if (message.fromId === selfId) return;
         await completePeerHandshake(message.answer);
-        return onPeerAnswer?.(message.fromId);
+        const { channel, sendMessage } = makeDataChannel(message.fromId);
+        return onPeerAnswer?.({
+          peerId: message.fromId,
+          channel,
+          sendMessage,
+        });
       }
       default: {
         throw new Error('unknown message kind');
@@ -97,20 +115,82 @@ export function createPeerToPeer({
   };
 
   async function makePeerOffer() {
+    await wait(1000);
+    console.log('makePeerOffer', peerConnection.signalingState);
     const offer = await peerConnection.createOffer();
+    await wait(1000);
+    console.log('makePeerOffer:setLocalDescription', peerConnection.signalingState);
     await peerConnection.setLocalDescription(new RTCSessionDescription(offer));
     return offer;
   }
 
   async function makePeerAnswer(offer: RTCSessionDescriptionInit) {
+    await wait(1000);
+    console.log('makePeerAnswer', peerConnection.signalingState);
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    await wait(1000);
+    console.log('makePeerAnswer:createAnswer', peerConnection.signalingState);
     const answer = await peerConnection.createAnswer();
+    await wait(1000);
+    console.log('makePeerAnswer:setLocalDescription', peerConnection.signalingState);
     await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
     return answer;
   }
 
   async function completePeerHandshake(answer: RTCSessionDescriptionInit) {
+    await wait(1000);
+    console.log('completePeerHandshake', peerConnection.signalingState);
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+  }
+
+  peerConnection.oniceconnectionstatechange = () => {
+    console.log('ICE Connection State Change:', peerConnection.iceConnectionState);
+  };
+
+  peerConnection.onsignalingstatechange = () => {
+    console.log('Signaling State Change:', peerConnection.signalingState, peerConnection);
+  };
+
+  peerConnection.setConfiguration({
+    iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
+  });
+
+  peerConnection.onicecandidate = (event) => {
+    console.log('ICE Candidate:', event.candidate);
+  };
+
+  peerConnection.ondatachannel = (event) => {
+    console.log('Data Channel:', event.channel, event);
+  };
+
+  function makeDataChannel(channelId: string) {
+    console.log('makeDataChannel', channelId);
+    const channel = peerConnection.createDataChannel(channelId);
+    channel.onopen = () => {
+      console.log('Data channel open', channelId);
+    };
+    channel.onmessage = (event) => {
+      console.log('Data channel message:', event.data, channelId);
+    };
+    channel.onclose = () => {
+      console.log('Data channel closed', channelId);
+    };
+    channel.onclosing = () => {
+      console.log('Data channel closing', channelId);
+    };
+    return {
+      channel,
+      async sendMessage(message: string) {
+        console.log(channel.readyState);
+        await wait(1000);
+        console.log(channel.readyState);
+        if (channel.readyState !== 'open') {
+          console.error('Data channel is not open', channel.readyState);
+          return;
+        }
+        channel.send(message);
+      },
+    };
   }
 
   return () => {
