@@ -27,7 +27,6 @@ const server = Bun.serve<User>({
   },
   websocket: {
     open(ws) {
-      lobby.push(ws.data);
       console.log(`${ws.data.id} connected`);
       // 1. tell the new client that they're connected
       {
@@ -44,29 +43,37 @@ const server = Bun.serve<User>({
       // 3. tell everyone else in the lobby that a new client has joined
       {
         const message: Message = { kind: 'connected', id: ws.data.id };
+        lobby.push(ws.data);
         server.publish('lobby', JSON.stringify(message));
       }
 
       // 4. subscribe the new client to all new lobby messages
       ws.subscribe('lobby');
 
-      // IDEA:
-      // support "I'll play anyone" mode by having the client transmit
-      // an offer to ALL connected clients. (basically what we currently
-      // do, minus the client-side filtering by id) but also allow the client
-      // to specify which user(s) they want to send offers to directly.
-
-      // without this, all requests get sent to all users in the lobby
-      // ws.subscribe(ws.data.id); // subscribe to your own id so that others can send you direct messages?
+      // 5. subscribe to your own id so that others can send you direct messages
+      ws.subscribe(ws.data.id);
     },
     message(ws, rawMessage) {
       if (typeof rawMessage !== 'string') return;
       try {
         const messageJson = JSON.parse(rawMessage);
         const message = messageSchema.parse(messageJson);
-        console.log(`received from ${ws.data.id}:`);
-        console.log(message);
-        server.publish('lobby', rawMessage);
+        switch (message.kind) {
+          case 'self-connected': {
+            console.log('self-connected should never fire in this part of the code');
+            return;
+          }
+          case 'peer-answer':
+          case 'peer-offer': {
+            server.publish(message.toId, rawMessage);
+            return;
+          }
+          default: {
+            console.log(`received from ${ws.data.id}:`);
+            console.log(message);
+            server.publish('lobby', rawMessage);
+          }
+        }
       } catch (err) {
         console.error(err);
       }

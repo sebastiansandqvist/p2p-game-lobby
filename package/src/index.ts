@@ -16,6 +16,7 @@ export function createPeerToPeer({
   onPeerDisconnected,
   onPeerOffer,
   onPeerAnswer,
+  onMessage,
 }: {
   /** eg. "wss://p2p-game-lobby.onrender.com" */
   websocketServerUrl: string;
@@ -45,14 +46,14 @@ export function createPeerToPeer({
     channel: RTCDataChannel;
     sendMessage: (message: string) => void;
   }) => void;
+  onMessage?: (message: string) => void;
 }) {
   const ws = new WebSocket(websocketServerUrl);
   const peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
   const channel = peerConnection.createDataChannel('lobby', { id: 0, negotiated: true });
 
-  channel.onmessage = (e) => console.log(e);
-
   const sendMessage = (message: string) => channel.send(message);
+  channel.onmessage = (e) => onMessage?.(e.data);
 
   // client doesn't initially know its own id, so we receive it in a message from the server in the `onSelfConnected` callback.
   // the sdp state is weird and needs to be set after all ice candidates have been gathered. hoping to find a better solution later.
@@ -88,8 +89,6 @@ export function createPeerToPeer({
         return onSelfConnected?.(localState.id);
       }
       case 'connected': {
-        if (message.id === localState.id) return; // TODO: probably ensure this server-side instead
-
         return onPeerConnected?.({
           peerId: message.id,
           async sendOffer() {
@@ -106,12 +105,9 @@ export function createPeerToPeer({
         });
       }
       case 'disconnected': {
-        // TODO: what if message.id === selfId?
         return onPeerDisconnected?.(message.id);
       }
       case 'peer-offer': {
-        // TODO: handle this server-side by putting each user into a channel keyed on their id
-        if (message.toId !== localState.id) return;
         await peerConnection.setRemoteDescription({ type: 'offer', sdp: message.offer.sdp });
         return onPeerOffer?.({
           peerId: message.fromId,
@@ -130,7 +126,6 @@ export function createPeerToPeer({
         });
       }
       case 'peer-answer': {
-        if (message.fromId === localState.id) return; // TODO: handle this server-side
         await peerConnection.setRemoteDescription({ type: 'answer', sdp: message.answer.sdp });
         return onPeerAnswer?.({
           peerId: message.fromId,
