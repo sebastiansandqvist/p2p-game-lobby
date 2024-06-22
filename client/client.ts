@@ -1,9 +1,10 @@
 import { createPeerToPeer } from '../package/src';
 
 const lobby = document.getElementById('lobby') as HTMLUListElement;
+const lobbyId = prompt('which lobby do you want to join?');
 
 createPeerToPeer({
-  websocketServerUrl: 'wss://p2p-game-lobby.onrender.com/',
+  websocketServerUrl: `wss://p2p-game-lobby.onrender.com/${lobbyId ?? 'shared'}`,
   onSelfConnected: (id) => {
     console.log('self connected', id);
   },
