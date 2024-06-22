@@ -14,7 +14,7 @@ services:
 
   - type: web
     name: p2p-game-lobby-demo
-    buildCommand: bun run build:client
+    buildCommand: bun i && bun run build:client
     runtime: static
     pullRequestPreviewsEnabled: false
     staticPublishPath: ./client
