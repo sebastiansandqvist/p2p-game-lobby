@@ -2,6 +2,12 @@ import { messageSchema, type Message } from './types';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// list of free STUN servers: https://gist.github.com/zziuni/3741933
+// GLOSSARY:
+// - STUN: Session Traversal Utilities for NAT
+// - TURN: Traversal Using Relay around NAT
+// - ICE: Interactive Connectivity Establishment
+
 /** returns a cleanup function */
 export function createPeerToPeer({
   websocketServerUrl,
@@ -40,35 +46,37 @@ export function createPeerToPeer({
     sendMessage: (message: string) => void;
   }) => void;
 }) {
-  // list of free STUN servers: https://gist.github.com/zziuni/3741933
-  // GLOSSARY:
-  // - STUN: Session Traversal Utilities for NAT
-  // - TURN: Traversal Using Relay around NAT
-  // - ICE: Interactive Connectivity Establishment
-
-  // this is not needed unless users are on different networks:
-  // { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-  const peerConnection = new RTCPeerConnection();
-
-  const channel = peerConnection.createDataChannel('12345'); //, { id: 1, negotiated: true }); // TODO: what should channel id be?
-  channel.onopen = () => console.log('Data channel open');
-  channel.onmessage = (event) => console.log('Data channel message:', event.data);
-  channel.onclose = () => console.log('Data channel closed');
-  channel.onclosing = () => console.log('Data channel closing');
-
-  async function sendMessage(message: string) {
-    console.log('sendMessage', message, channel.readyState);
-    if (channel.readyState !== 'open') {
-      console.error('Data channel is not open', channel.readyState);
-    }
-    channel.send(message);
-  }
-
   const ws = new WebSocket(websocketServerUrl);
-  let selfId = '';
+  const peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  const channel = peerConnection.createDataChannel('lobby', { id: 0, negotiated: true });
 
-  ws.onopen = () => console.log('ws onopen');
-  ws.onclose = () => console.log('ws onclose');
+  channel.onmessage = (e) => console.log(e);
+
+  const sendMessage = (message: string) => channel.send(message);
+
+  // client doesn't initially know its own id, so we receive it in a message from the server in the `onSelfConnected` callback.
+  // the sdp state is weird and needs to be set after all ice candidates have been gathered. hoping to find a better solution later.
+  const localState = {
+    id: '',
+    sdp: '',
+  };
+
+  const awaitLocalSdp = (): Promise<string> =>
+    new Promise((resolve) => {
+      if (localState.sdp) return resolve(localState.sdp);
+      peerConnection.onicecandidate = ({ candidate }) => {
+        if (candidate || !peerConnection.localDescription) return;
+        localState.sdp = peerConnection.localDescription.sdp;
+        peerConnection.onicecandidate = null;
+        resolve(localState.sdp);
+      };
+    });
+
+  peerConnection.onicecandidate = ({ candidate }) => {
+    if (candidate || !peerConnection.localDescription) return;
+    localState.sdp = peerConnection.localDescription.sdp;
+    peerConnection.onicecandidate = null;
+  };
 
   ws.onmessage = async (event) => {
     const message = messageSchema.parse(JSON.parse(event.data));
@@ -76,20 +84,22 @@ export function createPeerToPeer({
 
     switch (message.kind) {
       case 'self-connected': {
-        selfId = message.id;
-        return onSelfConnected?.(selfId);
+        localState.id = message.id;
+        return onSelfConnected?.(localState.id);
       }
       case 'connected': {
-        if (message.id === selfId) return; // TODO: probably ensure this server-side instead
+        if (message.id === localState.id) return; // TODO: probably ensure this server-side instead
+
         return onPeerConnected?.({
           peerId: message.id,
           async sendOffer() {
-            console.log('sendOffer', peerConnection.signalingState, message.id);
+            await peerConnection.setLocalDescription(await peerConnection.createOffer());
+            const sdp = await awaitLocalSdp();
             const offerMessage: Message = {
               kind: 'peer-offer',
               toId: message.id,
-              fromId: selfId,
-              offer: await makePeerOffer(),
+              fromId: localState.id,
+              offer: { type: 'offer', sdp },
             };
             ws.send(JSON.stringify(offerMessage));
           },
@@ -101,16 +111,18 @@ export function createPeerToPeer({
       }
       case 'peer-offer': {
         // TODO: handle this server-side by putting each user into a channel keyed on their id
-        if (message.toId !== selfId) return;
+        if (message.toId !== localState.id) return;
+        await peerConnection.setRemoteDescription({ type: 'offer', sdp: message.offer.sdp });
         return onPeerOffer?.({
           peerId: message.fromId,
           async sendAnswer() {
-            console.log('sendAnswer', peerConnection.signalingState, message.fromId);
+            await peerConnection.setLocalDescription(await peerConnection.createAnswer());
+            const sdp = await awaitLocalSdp();
             const answerMessage: Message = {
               kind: 'peer-answer',
               toId: message.fromId,
-              fromId: selfId,
-              answer: await makePeerAnswer(message.offer),
+              fromId: localState.id,
+              answer: { type: 'answer', sdp: sdp },
             };
             ws.send(JSON.stringify(answerMessage));
           },
@@ -118,47 +130,19 @@ export function createPeerToPeer({
         });
       }
       case 'peer-answer': {
-        if (message.fromId === selfId) return; // TODO: handle this server-side
-        await completePeerHandshake(message.answer);
+        if (message.fromId === localState.id) return; // TODO: handle this server-side
+        await peerConnection.setRemoteDescription({ type: 'answer', sdp: message.answer.sdp });
         return onPeerAnswer?.({
           peerId: message.fromId,
           channel,
           sendMessage,
         });
       }
-      case 'ice-candidate': {
-        if (!message.candidate || !message.candidate.address) return;
-        peerConnection.addIceCandidate(new RTCIceCandidate({ candidate: message.candidate.address }));
-        return;
-      }
       default: {
         throw new Error('unknown message kind');
       }
     }
   };
-
-  async function makePeerOffer() {
-    console.log('makePeerOffer', peerConnection.signalingState);
-    const offer = await peerConnection.createOffer();
-    console.log('makePeerOffer:setLocalDescription', peerConnection.signalingState);
-    await peerConnection.setLocalDescription(new RTCSessionDescription(offer));
-    return offer;
-  }
-
-  async function makePeerAnswer(offer: RTCSessionDescriptionInit) {
-    console.log('makePeerAnswer', peerConnection.signalingState);
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-    console.log('makePeerAnswer:createAnswer', peerConnection.signalingState);
-    const answer = await peerConnection.createAnswer();
-    console.log('makePeerAnswer:setLocalDescription', peerConnection.signalingState);
-    await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
-    return answer;
-  }
-
-  async function completePeerHandshake(answer: RTCSessionDescriptionInit) {
-    console.log('completePeerHandshake', peerConnection.signalingState);
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-  }
 
   peerConnection.oniceconnectionstatechange = () => {
     console.log('ICE Connection State Change:', peerConnection.iceConnectionState);
@@ -170,17 +154,6 @@ export function createPeerToPeer({
 
   peerConnection.ondatachannel = (event) => {
     console.log('Data Channel:', event.channel, event);
-  };
-
-  peerConnection.onicecandidate = (event) => {
-    console.log('ICE Candidate:', event.candidate);
-    const message: Message = {
-      kind: 'ice-candidate',
-      fromId: selfId,
-      toId: 'TODO',
-      candidate: event.candidate,
-    };
-    ws.send(JSON.stringify(message));
   };
 
   return () => {
