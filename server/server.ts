@@ -1,4 +1,4 @@
-import { messageSchema, type Message } from '../types';
+import { messageSchema, type Message } from '../package/src/types';
 // goals:
 // - create a lobby of all clients waiting to connect to one another by username
 // - any new client can view waiting clients in the lobby by username and create a p2p connection with them
@@ -79,5 +79,5 @@ const server = Bun.serve<User>({
       server.publish('lobby', JSON.stringify(message));
     },
   },
-  port: process.env.PORT ?? 3333,
+  port: process.env['PORT'] ?? 3333,
 });

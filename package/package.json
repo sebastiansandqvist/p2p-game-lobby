@@ -1,0 +1,21 @@
+{
+  "name": "@seabass/p2p",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "p2p client helpers",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist/**/*"],
+  "module": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "TODO: figure this out!!! tsc --declaration --rootDir src --outDir dist --module ESNext --target ESNext ./src/index.ts",
+    "prepublish": "bun run build"
+  },
+  "dependencies": {
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "5.5.2"
+  }
+}
