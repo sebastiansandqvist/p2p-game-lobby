@@ -49,11 +49,26 @@ export function createPeerToPeer({
   onMessage?: (message: string) => void;
 }) {
   const ws = new WebSocket(websocketServerUrl);
-  const peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  const peerConnection = new RTCPeerConnection({
+    iceServers: [
+      {
+        urls: [
+          'stun:stun.l.google.com:19302',
+          'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302',
+          'stun:stun3.l.google.com:19302',
+          'stun:stun4.l.google.com:19302',
+        ],
+      },
+    ],
+  });
   const channel = peerConnection.createDataChannel('lobby', { id: 0, negotiated: true });
 
   const sendMessage = (message: string) => channel.send(message);
-  channel.onmessage = (e) => onMessage?.(e.data);
+  channel.onmessage = (e) => {
+    console.log(e);
+    onMessage?.(e.data);
+  };
 
   // client doesn't initially know its own id, so we receive it in a message from the server in the `onSelfConnected` callback.
   // the sdp state is weird and needs to be set after all ice candidates have been gathered. hoping to find a better solution later.
