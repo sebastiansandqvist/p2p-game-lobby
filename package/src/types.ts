@@ -43,6 +43,19 @@ export const peerAnswerMessageSchema = z.object({
   answer: webRtcOfferSchema,
 });
 
+export const iceCandidateMessageSchema = z.object({
+  kind: z.literal('ice-candidate'),
+  toId: z.string(),
+  fromId: z.string(),
+  candidate: z
+    .object({
+      address: z.string().nullable(),
+    })
+    .nullable(),
+});
+
+export type IceCandidateMessage = z.infer<typeof iceCandidateMessageSchema>;
+
 export type PeerAnswerMessage = z.infer<typeof peerAnswerMessageSchema>;
 
 export const messageSchema = z.union([
@@ -51,6 +64,7 @@ export const messageSchema = z.union([
   disconnectionMessageSchema,
   peerOfferMessageSchema,
   peerAnswerMessageSchema,
+  iceCandidateMessageSchema,
 ]);
 
 export type Message = z.infer<typeof messageSchema>;

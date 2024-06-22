@@ -24,7 +24,7 @@ createPeerToPeer({
     const li = document.querySelector(`li[data-id="${peerId}"]`);
     if (li) li.remove();
   },
-  onPeerOffer: ({ peerId, sendAnswer }) => {
+  onPeerOffer: ({ peerId, sendAnswer, sendMessage }) => {
     const li = document.querySelector(`li[data-id="${peerId}"]`) as HTMLLIElement;
     if (!li) return;
     const button = li.querySelector('button')!;
@@ -32,6 +32,17 @@ createPeerToPeer({
       button.disabled = true;
       await sendAnswer();
       li.style.color = 'green';
+
+      const input = document.createElement('input');
+      input.placeholder = 'message';
+      const submitButton = document.createElement('button');
+      submitButton.textContent = 'send';
+      submitButton.onclick = () => {
+        sendMessage(input.value);
+        input.value = '';
+      };
+      li.appendChild(input);
+      li.appendChild(submitButton);
     };
     button.textContent = 'accept';
   },

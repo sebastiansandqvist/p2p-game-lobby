@@ -20,7 +20,15 @@ export function createPeerToPeer({
   /** called when another has disconnected from the lobby */
   onPeerDisconnected?: (peerId: string) => void;
   /** called when another user has sent a p2p connection offer to the current user */
-  onPeerOffer?: ({ peerId, sendAnswer }: { peerId: string; sendAnswer: () => Promise<void> }) => void;
+  onPeerOffer?: ({
+    peerId,
+    sendAnswer,
+    sendMessage,
+  }: {
+    peerId: string;
+    sendAnswer: () => Promise<void>;
+    sendMessage: (message: string) => void;
+  }) => void;
   /** called when another user has sent a p2p connection answer to the current user */
   onPeerAnswer?: ({
     peerId,
@@ -32,28 +40,39 @@ export function createPeerToPeer({
     sendMessage: (message: string) => void;
   }) => void;
 }) {
-  const peerConnection = new RTCPeerConnection();
-  const ws = new WebSocket(websocketServerUrl);
+  // list of free STUN servers: https://gist.github.com/zziuni/3741933
+  // GLOSSARY:
+  // - STUN: Session Traversal Utilities for NAT
+  // - TURN: Traversal Using Relay around NAT
+  // - ICE: Interactive Connectivity Establishment
 
+  // this is not needed unless users are on different networks:
+  // { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+  const peerConnection = new RTCPeerConnection();
+
+  const channel = peerConnection.createDataChannel('12345'); //, { id: 1, negotiated: true }); // TODO: what should channel id be?
+  channel.onopen = () => console.log('Data channel open');
+  channel.onmessage = (event) => console.log('Data channel message:', event.data);
+  channel.onclose = () => console.log('Data channel closed');
+  channel.onclosing = () => console.log('Data channel closing');
+
+  async function sendMessage(message: string) {
+    console.log('sendMessage', message, channel.readyState);
+    if (channel.readyState !== 'open') {
+      console.error('Data channel is not open', channel.readyState);
+    }
+    channel.send(message);
+  }
+
+  const ws = new WebSocket(websocketServerUrl);
   let selfId = '';
 
-  ws.onopen = () => {
-    // if (import.meta.env.DEV) {
-    console.log('ws onopen');
-    // }
-  };
-
-  ws.onclose = () => {
-    // if (import.meta.env.DEV) {
-    console.log('ws onclose');
-    // }
-  };
+  ws.onopen = () => console.log('ws onopen');
+  ws.onclose = () => console.log('ws onclose');
 
   ws.onmessage = async (event) => {
     const message = messageSchema.parse(JSON.parse(event.data));
-    // if (import.meta.env.DEV) {
     console.log(message);
-    // }
 
     switch (message.kind) {
       case 'self-connected': {
@@ -81,7 +100,6 @@ export function createPeerToPeer({
         return onPeerDisconnected?.(message.id);
       }
       case 'peer-offer': {
-        // TEMPORARY.
         // TODO: handle this server-side by putting each user into a channel keyed on their id
         if (message.toId !== selfId) return;
         return onPeerOffer?.({
@@ -96,17 +114,22 @@ export function createPeerToPeer({
             };
             ws.send(JSON.stringify(answerMessage));
           },
+          sendMessage,
         });
       }
       case 'peer-answer': {
-        if (message.fromId === selfId) return;
+        if (message.fromId === selfId) return; // TODO: handle this server-side
         await completePeerHandshake(message.answer);
-        const { channel, sendMessage } = makeDataChannel(message.fromId);
         return onPeerAnswer?.({
           peerId: message.fromId,
           channel,
           sendMessage,
         });
+      }
+      case 'ice-candidate': {
+        if (!message.candidate || !message.candidate.address) return;
+        peerConnection.addIceCandidate(new RTCIceCandidate({ candidate: message.candidate.address }));
+        return;
       }
       default: {
         throw new Error('unknown message kind');
@@ -115,30 +138,24 @@ export function createPeerToPeer({
   };
 
   async function makePeerOffer() {
-    await wait(1000);
     console.log('makePeerOffer', peerConnection.signalingState);
     const offer = await peerConnection.createOffer();
-    await wait(1000);
     console.log('makePeerOffer:setLocalDescription', peerConnection.signalingState);
     await peerConnection.setLocalDescription(new RTCSessionDescription(offer));
     return offer;
   }
 
   async function makePeerAnswer(offer: RTCSessionDescriptionInit) {
-    await wait(1000);
     console.log('makePeerAnswer', peerConnection.signalingState);
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-    await wait(1000);
     console.log('makePeerAnswer:createAnswer', peerConnection.signalingState);
     const answer = await peerConnection.createAnswer();
-    await wait(1000);
     console.log('makePeerAnswer:setLocalDescription', peerConnection.signalingState);
     await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
     return answer;
   }
 
   async function completePeerHandshake(answer: RTCSessionDescriptionInit) {
-    await wait(1000);
     console.log('completePeerHandshake', peerConnection.signalingState);
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
   }
@@ -151,47 +168,20 @@ export function createPeerToPeer({
     console.log('Signaling State Change:', peerConnection.signalingState, peerConnection);
   };
 
-  peerConnection.setConfiguration({
-    iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
-  });
-
-  peerConnection.onicecandidate = (event) => {
-    console.log('ICE Candidate:', event.candidate);
-  };
-
   peerConnection.ondatachannel = (event) => {
     console.log('Data Channel:', event.channel, event);
   };
 
-  function makeDataChannel(channelId: string) {
-    console.log('makeDataChannel', channelId);
-    const channel = peerConnection.createDataChannel(channelId);
-    channel.onopen = () => {
-      console.log('Data channel open', channelId);
+  peerConnection.onicecandidate = (event) => {
+    console.log('ICE Candidate:', event.candidate);
+    const message: Message = {
+      kind: 'ice-candidate',
+      fromId: selfId,
+      toId: 'TODO',
+      candidate: event.candidate,
     };
-    channel.onmessage = (event) => {
-      console.log('Data channel message:', event.data, channelId);
-    };
-    channel.onclose = () => {
-      console.log('Data channel closed', channelId);
-    };
-    channel.onclosing = () => {
-      console.log('Data channel closing', channelId);
-    };
-    return {
-      channel,
-      async sendMessage(message: string) {
-        console.log(channel.readyState);
-        await wait(1000);
-        console.log(channel.readyState);
-        if (channel.readyState !== 'open') {
-          console.error('Data channel is not open', channel.readyState);
-          return;
-        }
-        channel.send(message);
-      },
-    };
-  }
+    ws.send(JSON.stringify(message));
+  };
 
   return () => {
     ws.close();
