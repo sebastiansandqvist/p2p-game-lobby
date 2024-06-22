@@ -11,3 +11,13 @@ services:
     pullRequestPreviewsEnabled: false
     region: oregon
     startCommand: bun run start:server
+
+  - type: web
+    name: p2p-game-lobby-demo
+    buildCommand: bun run build:client
+    runtime: static
+    envVars:
+      - key: SKIP_INSTALL_DEPS
+        value: 'true'
+    pullRequestPreviewsEnabled: false
+    staticPublishPath: ./client

@@ -36,12 +36,18 @@ createPeerToPeer({
 
       const input = document.createElement('input');
       input.placeholder = 'message';
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          sendMessage(input.value);
+          input.value = '';
+        }
+      };
       const submitButton = document.createElement('button');
       submitButton.textContent = 'send';
       submitButton.onclick = () => {
-        console.log('sending', input.value);
         sendMessage(input.value);
         input.value = '';
+        input.focus();
       };
       li.appendChild(input);
       li.appendChild(submitButton);
@@ -57,12 +63,18 @@ createPeerToPeer({
 
     const input = document.createElement('input');
     input.placeholder = 'message';
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        sendMessage(input.value);
+        input.value = '';
+      }
+    };
     const submitButton = document.createElement('button');
     submitButton.textContent = 'send';
     submitButton.onclick = () => {
-      console.log('sending', input.value);
       sendMessage(input.value);
       input.value = '';
+      input.focus();
     };
     li.appendChild(input);
     li.appendChild(submitButton);

@@ -65,10 +65,7 @@ export function createPeerToPeer({
   const channel = peerConnection.createDataChannel('lobby', { id: 0, negotiated: true });
 
   const sendMessage = (message: string) => channel.send(message);
-  channel.onmessage = (e) => {
-    console.log(e);
-    onMessage?.(e.data);
-  };
+  channel.onmessage = (e) => onMessage?.(e.data);
 
   // client doesn't initially know its own id, so we receive it in a message from the server in the `onSelfConnected` callback.
   // the sdp state is weird and needs to be set after all ice candidates have been gathered. hoping to find a better solution later.
@@ -154,17 +151,19 @@ export function createPeerToPeer({
     }
   };
 
-  peerConnection.oniceconnectionstatechange = () => {
-    console.log('ICE Connection State Change:', peerConnection.iceConnectionState);
-  };
+  /*
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log('ICE Connection State Change:', peerConnection.iceConnectionState);
+    };
 
-  peerConnection.onsignalingstatechange = () => {
-    console.log('Signaling State Change:', peerConnection.signalingState, peerConnection);
-  };
+    peerConnection.onsignalingstatechange = () => {
+      console.log('Signaling State Change:', peerConnection.signalingState, peerConnection);
+    };
 
-  peerConnection.ondatachannel = (event) => {
-    console.log('Data Channel:', event.channel, event);
-  };
+    peerConnection.ondatachannel = (event) => {
+      console.log('Data Channel:', event.channel, event);
+    };
+  */
 
   return () => {
     ws.close();
