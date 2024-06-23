@@ -18,12 +18,12 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
 
   drawLines(ctx, boardRect);
 
-  for (const { x, y } of gameState.xs) {
-    drawX(ctx, boardRect, { x, y });
+  for (const { col, row } of gameState.xs) {
+    drawX(ctx, boardRect, { col, row });
   }
 
-  for (const { x, y } of gameState.os) {
-    drawO(ctx, boardRect, { x, y });
+  for (const { col, row } of gameState.os) {
+    drawO(ctx, boardRect, { col, row });
   }
 
   const gameOverLine = gameOverLineOrState();
@@ -41,14 +41,15 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
 
   if (gameState.mouseClickCoords) {
     const cell = getCellUnderMouse(gameState.mouseClickCoords, boardRect);
+    console.log(cell);
     gameState.mouseClickCoords = null;
 
-    const isOnBoard = cell.x >= 0 && cell.x <= 2 && cell.y >= 0 && cell.y <= 2;
+    const isOnBoard = cell.col >= 0 && cell.col <= 2 && cell.row >= 0 && cell.row <= 2;
     if (!isOnBoard) return;
 
     const isUnplayed =
-      gameState.xs.every(({ x, y }) => x !== cell.x || y !== cell.y) &&
-      gameState.os.every(({ x, y }) => x !== cell.x || y !== cell.y);
+      gameState.xs.every(({ col, row }) => col !== cell.col || row !== cell.row) &&
+      gameState.os.every(({ col, row }) => col !== cell.col || row !== cell.row);
     if (!isUnplayed) return;
 
     const isCurrentPlayerTurn =
@@ -79,8 +80,8 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
     sendMessage({
       kind: 'move',
       fromPlayer: gameState.player,
-      x: cell.x,
-      y: cell.y,
+      col: cell.col,
+      row: cell.row,
     });
   }
 }
@@ -90,13 +91,13 @@ export function getCellUnderMouse(
   mouse: { x: number; y: number },
   boardRect: { x: number; y: number; width: number; height: number; squareSize: number },
 ) {
-  const x = Math.floor((mouse.x - boardRect.x) / boardRect.squareSize);
-  const y = Math.floor((mouse.y - boardRect.y) / boardRect.squareSize);
-  return { x, y };
+  const col = Math.floor((mouse.x - boardRect.x) / boardRect.squareSize);
+  const row = Math.floor((mouse.y - boardRect.y) / boardRect.squareSize);
+  return { col, row };
 }
 
-function isCellInBounds({ x, y }: { x: number; y: number }) {
-  return x >= 0 && x <= 2 && y >= 0 && y <= 2;
+function isCellInBounds({ col, row }: { col: number; row: number }) {
+  return col >= 0 && col <= 2 && row >= 0 && row <= 2;
 }
 
 export function hoverMove(
@@ -106,12 +107,12 @@ export function hoverMove(
 ) {
   const board = calculateBoardRect(canvasRect);
   const cell = getCellUnderMouse(gameState.mouseCoords, board);
-  const cellX = board.x + board.squareSize * cell.x;
-  const cellY = board.y + board.squareSize * cell.y;
+  const cellX = board.x + board.squareSize * cell.col;
+  const cellY = board.y + board.squareSize * cell.row;
 
   const cellHasPiece =
-    gameState.xs.some(({ x, y }) => x === cell.x && y === cell.y) ||
-    gameState.os.some(({ x, y }) => x === cell.x && y === cell.y);
+    gameState.xs.some(({ col, row }) => col === cell.col && row === cell.row) ||
+    gameState.os.some(({ col, row }) => col === cell.col && row === cell.row);
 
   if (cellHasPiece) return;
 
@@ -129,12 +130,12 @@ export function hoverMove(
 
   ctx.globalAlpha = 0.5;
   if (gameState.player === 'x') {
-    if (!gameState.os.some(({ x, y }) => x === cell.x && y === cell.y)) {
+    if (!gameState.os.some(({ col, row }) => col === cell.col && row === cell.row)) {
       drawX(ctx, board, cell);
     }
   }
   if (gameState.player === 'o') {
-    if (!gameState.xs.some(({ x, y }) => x === cell.x && y === cell.y)) {
+    if (!gameState.xs.some(({ col, row }) => col === cell.col && row === cell.row)) {
       drawO(ctx, board, cell);
     }
   }
@@ -144,10 +145,10 @@ export function hoverMove(
 function drawX(
   ctx: CanvasRenderingContext2D,
   board: { x: number; y: number; width: number; height: number; squareSize: number },
-  cell: { x: number; y: number }, // integers from 0 to 2
+  cell: { col: number; row: number }, // integers from 0 to 2
 ) {
-  const cellX = board.x + board.squareSize * cell.x;
-  const cellY = board.y + board.squareSize * cell.y;
+  const cellX = board.x + board.squareSize * cell.col;
+  const cellY = board.y + board.squareSize * cell.row;
   const padding = board.squareSize * 0.3;
 
   ctx.strokeStyle = '#34d399';
@@ -163,10 +164,10 @@ function drawX(
 function drawO(
   ctx: CanvasRenderingContext2D,
   board: { x: number; y: number; width: number; height: number; squareSize: number },
-  cell: { x: number; y: number }, // integers from 0 to 2
+  cell: { col: number; row: number }, // integers from 0 to 2
 ) {
-  const cellX = board.x + board.squareSize * cell.x;
-  const cellY = board.y + board.squareSize * cell.y;
+  const cellX = board.x + board.squareSize * cell.col;
+  const cellY = board.y + board.squareSize * cell.row;
   const padding = board.squareSize * 0.25;
   ctx.strokeStyle = '#fbbf24';
   ctx.lineWidth = board.squareSize * 0.1;
@@ -220,15 +221,16 @@ function drawLines(
   ctx.stroke();
 }
 
+// TODO: make lines the full height or width (or both for diagonals), depending on their orientation
 function drawLine(
   ctx: CanvasRenderingContext2D,
   board: { x: number; y: number; width: number; height: number; squareSize: number },
-  line: { x: number; y: number }[],
+  line: { col: number; row: number }[],
 ) {
-  const centerOfStartX = board.x + line[0].x * board.squareSize + board.squareSize / 2;
-  const centerOfStartY = board.y + line[0].y * board.squareSize + board.squareSize / 2;
-  const centerOfEndX = board.x + line[2].x * board.squareSize + board.squareSize / 2;
-  const centerOfEndY = board.y + line[2].y * board.squareSize + board.squareSize / 2;
+  const centerOfStartX = board.x + line[0].col * board.squareSize + board.squareSize / 2;
+  const centerOfStartY = board.y + line[0].row * board.squareSize + board.squareSize / 2;
+  const centerOfEndX = board.x + line[2].col * board.squareSize + board.squareSize / 2;
+  const centerOfEndY = board.y + line[2].row * board.squareSize + board.squareSize / 2;
 
   ctx.strokeStyle = '#e11d48';
   ctx.lineWidth = board.squareSize * 0.1;

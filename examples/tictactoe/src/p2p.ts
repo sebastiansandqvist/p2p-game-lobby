@@ -45,11 +45,11 @@ const p2p = createPeerToPeer({
         break;
       }
       case 'move': {
-        const { x, y } = message;
+        const { col, row } = message;
         if (message.fromPlayer === 'x') {
-          gameState.xs.push({ x, y });
+          gameState.xs.push({ col, row });
         } else {
-          gameState.os.push({ x, y });
+          gameState.os.push({ col, row });
         }
         if (gameOverLineOrState()) {
           gameState.state = 'gameover';

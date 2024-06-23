@@ -1,4 +1,5 @@
 export const gameState = {
+  // TODO: how many of these states can we remove, if any?
   state: 'idle' as
     | 'idle'
     | 'click-to-connect'
@@ -8,65 +9,69 @@ export const gameState = {
     | 'playing'
     | 'gameover',
   player: 'x' as 'x' | 'o',
-  mouseCoords: { x: -999, y: -999 }, // x and y are in px values, not [0, 2] -- just starting somewhere offscreen so mobile users don't see a weird square
-  mouseClickCoords: null as { x: number; y: number } | null, // also px values
-  xs: [] as { x: number; y: number }[],
-  os: [] as { x: number; y: number }[],
+  mouseCoords: { x: -999, y: -999 }, // starting somewhere offscreen so mobile users don't see a weird square
+  mouseClickCoords: null as { x: number; y: number } | null,
+  xs: [] as { col: number; row: number }[],
+  os: [] as { col: number; row: number }[],
 };
 
 (window as any)['gameState'] = gameState;
 
 const winningBoards = [
   [
-    { x: 0, y: 0 },
-    { x: 1, y: 0 },
-    { x: 2, y: 0 },
+    { col: 0, row: 0 },
+    { col: 1, row: 0 },
+    { col: 2, row: 0 },
   ],
   [
-    { x: 0, y: 1 },
-    { x: 1, y: 1 },
-    { x: 2, y: 1 },
+    { col: 0, row: 1 },
+    { col: 1, row: 1 },
+    { col: 2, row: 1 },
   ],
   [
-    { x: 0, y: 2 },
-    { x: 1, y: 2 },
-    { x: 2, y: 2 },
-  ],
-
-  [
-    { x: 0, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: 2 },
-  ],
-  [
-    { x: 1, y: 0 },
-    { x: 1, y: 1 },
-    { x: 1, y: 2 },
-  ],
-  [
-    { x: 2, y: 0 },
-    { x: 2, y: 1 },
-    { x: 2, y: 2 },
+    { col: 0, row: 2 },
+    { col: 1, row: 2 },
+    { col: 2, row: 2 },
   ],
 
   [
-    { x: 0, y: 0 },
-    { x: 1, y: 1 },
-    { x: 2, y: 2 },
+    { col: 0, row: 0 },
+    { col: 0, row: 1 },
+    { col: 0, row: 2 },
   ],
   [
-    { x: 2, y: 0 },
-    { x: 1, y: 1 },
-    { x: 0, y: 2 },
+    { col: 1, row: 0 },
+    { col: 1, row: 1 },
+    { col: 1, row: 2 },
+  ],
+  [
+    { col: 2, row: 0 },
+    { col: 2, row: 1 },
+    { col: 2, row: 2 },
+  ],
+
+  [
+    { col: 0, row: 0 },
+    { col: 1, row: 1 },
+    { col: 2, row: 2 },
+  ],
+  [
+    { col: 2, row: 0 },
+    { col: 1, row: 1 },
+    { col: 0, row: 2 },
   ],
 ] as const;
 
 export function gameOverLineOrState() {
   for (const line of winningBoards) {
-    if (line.every((win) => gameState.xs.find((coord) => coord.x === win.x && coord.y === win.y) !== undefined)) {
+    if (
+      line.every((win) => gameState.xs.find((coord) => coord.col === win.col && coord.row === win.row) !== undefined)
+    ) {
       return line;
     }
-    if (line.every((win) => gameState.os.find((coord) => coord.x === win.x && coord.y === win.y) !== undefined)) {
+    if (
+      line.every((win) => gameState.os.find((coord) => coord.col === win.col && coord.row === win.row) !== undefined)
+    ) {
       return line;
     }
   }

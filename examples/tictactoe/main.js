@@ -1,10 +1,10 @@
 // src/state.ts
 function gameOverLineOrState() {
   for (const line of winningBoards) {
-    if (line.every((win) => gameState.xs.find((coord) => coord.x === win.x && coord.y === win.y) !== undefined)) {
+    if (line.every((win) => gameState.xs.find((coord) => coord.col === win.col && coord.row === win.row) !== undefined)) {
       return line;
     }
-    if (line.every((win) => gameState.os.find((coord) => coord.x === win.x && coord.y === win.y) !== undefined)) {
+    if (line.every((win) => gameState.os.find((coord) => coord.col === win.col && coord.row === win.row) !== undefined)) {
       return line;
     }
   }
@@ -23,44 +23,44 @@ var gameState = {
 window["gameState"] = gameState;
 var winningBoards = [
   [
-    { x: 0, y: 0 },
-    { x: 1, y: 0 },
-    { x: 2, y: 0 }
+    { col: 0, row: 0 },
+    { col: 1, row: 0 },
+    { col: 2, row: 0 }
   ],
   [
-    { x: 0, y: 1 },
-    { x: 1, y: 1 },
-    { x: 2, y: 1 }
+    { col: 0, row: 1 },
+    { col: 1, row: 1 },
+    { col: 2, row: 1 }
   ],
   [
-    { x: 0, y: 2 },
-    { x: 1, y: 2 },
-    { x: 2, y: 2 }
+    { col: 0, row: 2 },
+    { col: 1, row: 2 },
+    { col: 2, row: 2 }
   ],
   [
-    { x: 0, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: 2 }
+    { col: 0, row: 0 },
+    { col: 0, row: 1 },
+    { col: 0, row: 2 }
   ],
   [
-    { x: 1, y: 0 },
-    { x: 1, y: 1 },
-    { x: 1, y: 2 }
+    { col: 1, row: 0 },
+    { col: 1, row: 1 },
+    { col: 1, row: 2 }
   ],
   [
-    { x: 2, y: 0 },
-    { x: 2, y: 1 },
-    { x: 2, y: 2 }
+    { col: 2, row: 0 },
+    { col: 2, row: 1 },
+    { col: 2, row: 2 }
   ],
   [
-    { x: 0, y: 0 },
-    { x: 1, y: 1 },
-    { x: 2, y: 2 }
+    { col: 0, row: 0 },
+    { col: 1, row: 1 },
+    { col: 2, row: 2 }
   ],
   [
-    { x: 2, y: 0 },
-    { x: 1, y: 1 },
-    { x: 0, y: 2 }
+    { col: 2, row: 0 },
+    { col: 1, row: 1 },
+    { col: 0, row: 2 }
   ]
 ];
 
@@ -7965,8 +7965,8 @@ var newGame = z2.object({
 var move = z2.object({
   kind: z2.literal("move"),
   fromPlayer: z2.union([z2.literal("x"), z2.literal("o")]),
-  x: z2.number(),
-  y: z2.number()
+  col: z2.number(),
+  row: z2.number()
 });
 var messageSchema2 = z2.union([newGame, move]);
 
@@ -8031,11 +8031,11 @@ var p2p = createPeerToPeer({
         break;
       }
       case "move": {
-        const { x, y } = message;
+        const { col, row } = message;
         if (message.fromPlayer === "x") {
-          gameState.xs.push({ x, y });
+          gameState.xs.push({ col, row });
         } else {
-          gameState.os.push({ x, y });
+          gameState.os.push({ col, row });
         }
         if (gameOverLineOrState()) {
           gameState.state = "gameover";
@@ -8058,11 +8058,11 @@ function drawGame(ctx, canvasRect) {
   ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
   const boardRect = calculateBoardRect(canvasRect);
   drawLines(ctx, boardRect);
-  for (const { x, y } of gameState.xs) {
-    drawX(ctx, boardRect, { x, y });
+  for (const { col, row } of gameState.xs) {
+    drawX(ctx, boardRect, { col, row });
   }
-  for (const { x, y } of gameState.os) {
-    drawO(ctx, boardRect, { x, y });
+  for (const { col, row } of gameState.os) {
+    drawO(ctx, boardRect, { col, row });
   }
   const gameOverLine = gameOverLineOrState();
   if (Array.isArray(gameOverLine)) {
@@ -8076,11 +8076,12 @@ function drawGame(ctx, canvasRect) {
   hoverMove(ctx, canvasRect, gameState);
   if (gameState.mouseClickCoords) {
     const cell = getCellUnderMouse(gameState.mouseClickCoords, boardRect);
+    console.log(cell);
     gameState.mouseClickCoords = null;
-    const isOnBoard = cell.x >= 0 && cell.x <= 2 && cell.y >= 0 && cell.y <= 2;
+    const isOnBoard = cell.col >= 0 && cell.col <= 2 && cell.row >= 0 && cell.row <= 2;
     if (!isOnBoard)
       return;
-    const isUnplayed = gameState.xs.every(({ x, y }) => x !== cell.x || y !== cell.y) && gameState.os.every(({ x, y }) => x !== cell.x || y !== cell.y);
+    const isUnplayed = gameState.xs.every(({ col, row }) => col !== cell.col || row !== cell.row) && gameState.os.every(({ col, row }) => col !== cell.col || row !== cell.row);
     if (!isUnplayed)
       return;
     const isCurrentPlayerTurn = gameState.player === "x" ? gameState.xs.length === gameState.os.length : gameState.xs.length > gameState.os.length;
@@ -8106,25 +8107,25 @@ function drawGame(ctx, canvasRect) {
     sendMessage({
       kind: "move",
       fromPlayer: gameState.player,
-      x: cell.x,
-      y: cell.y
+      col: cell.col,
+      row: cell.row
     });
   }
 }
 function getCellUnderMouse(mouse, boardRect) {
-  const x = Math.floor((mouse.x - boardRect.x) / boardRect.squareSize);
-  const y = Math.floor((mouse.y - boardRect.y) / boardRect.squareSize);
-  return { x, y };
+  const col = Math.floor((mouse.x - boardRect.x) / boardRect.squareSize);
+  const row = Math.floor((mouse.y - boardRect.y) / boardRect.squareSize);
+  return { col, row };
 }
-var isCellInBounds = function({ x, y }) {
-  return x >= 0 && x <= 2 && y >= 0 && y <= 2;
+var isCellInBounds = function({ col, row }) {
+  return col >= 0 && col <= 2 && row >= 0 && row <= 2;
 };
 function hoverMove(ctx, canvasRect, gameState2) {
   const board = calculateBoardRect(canvasRect);
   const cell = getCellUnderMouse(gameState2.mouseCoords, board);
-  const cellX = board.x + board.squareSize * cell.x;
-  const cellY = board.y + board.squareSize * cell.y;
-  const cellHasPiece = gameState2.xs.some(({ x, y }) => x === cell.x && y === cell.y) || gameState2.os.some(({ x, y }) => x === cell.x && y === cell.y);
+  const cellX = board.x + board.squareSize * cell.col;
+  const cellY = board.y + board.squareSize * cell.row;
+  const cellHasPiece = gameState2.xs.some(({ col, row }) => col === cell.col && row === cell.row) || gameState2.os.some(({ col, row }) => col === cell.col && row === cell.row);
   if (cellHasPiece)
     return;
   if (!isCellInBounds(cell)) {
@@ -8135,20 +8136,20 @@ function hoverMove(ctx, canvasRect, gameState2) {
   }
   ctx.globalAlpha = 0.5;
   if (gameState2.player === "x") {
-    if (!gameState2.os.some(({ x, y }) => x === cell.x && y === cell.y)) {
+    if (!gameState2.os.some(({ col, row }) => col === cell.col && row === cell.row)) {
       drawX(ctx, board, cell);
     }
   }
   if (gameState2.player === "o") {
-    if (!gameState2.xs.some(({ x, y }) => x === cell.x && y === cell.y)) {
+    if (!gameState2.xs.some(({ col, row }) => col === cell.col && row === cell.row)) {
       drawO(ctx, board, cell);
     }
   }
   ctx.globalAlpha = 1;
 }
 var drawX = function(ctx, board, cell) {
-  const cellX = board.x + board.squareSize * cell.x;
-  const cellY = board.y + board.squareSize * cell.y;
+  const cellX = board.x + board.squareSize * cell.col;
+  const cellY = board.y + board.squareSize * cell.row;
   const padding = board.squareSize * 0.3;
   ctx.strokeStyle = "#34d399";
   ctx.lineWidth = board.squareSize * 0.1;
@@ -8160,8 +8161,8 @@ var drawX = function(ctx, board, cell) {
   ctx.stroke();
 };
 var drawO = function(ctx, board, cell) {
-  const cellX = board.x + board.squareSize * cell.x;
-  const cellY = board.y + board.squareSize * cell.y;
+  const cellX = board.x + board.squareSize * cell.col;
+  const cellY = board.y + board.squareSize * cell.row;
   const padding = board.squareSize * 0.25;
   ctx.strokeStyle = "#fbbf24";
   ctx.lineWidth = board.squareSize * 0.1;
@@ -8195,10 +8196,10 @@ var drawLines = function(ctx, board) {
   ctx.stroke();
 };
 var drawLine = function(ctx, board, line) {
-  const centerOfStartX = board.x + line[0].x * board.squareSize + board.squareSize / 2;
-  const centerOfStartY = board.y + line[0].y * board.squareSize + board.squareSize / 2;
-  const centerOfEndX = board.x + line[2].x * board.squareSize + board.squareSize / 2;
-  const centerOfEndY = board.y + line[2].y * board.squareSize + board.squareSize / 2;
+  const centerOfStartX = board.x + line[0].col * board.squareSize + board.squareSize / 2;
+  const centerOfStartY = board.y + line[0].row * board.squareSize + board.squareSize / 2;
+  const centerOfEndX = board.x + line[2].col * board.squareSize + board.squareSize / 2;
+  const centerOfEndY = board.y + line[2].row * board.squareSize + board.squareSize / 2;
   ctx.strokeStyle = "#e11d48";
   ctx.lineWidth = board.squareSize * 0.1;
   ctx.beginPath();
@@ -8254,5 +8255,4 @@ window.addEventListener("pointerup", (e) => {
   if (gameState.state !== "playing")
     return;
   gameState.mouseClickCoords = { x: e.x, y: e.y };
-  console.log(gameState.mouseClickCoords);
 });

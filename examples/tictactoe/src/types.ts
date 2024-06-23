@@ -8,8 +8,8 @@ const newGame = z.object({
 const move = z.object({
   kind: z.literal('move'),
   fromPlayer: z.union([z.literal('x'), z.literal('o')]),
-  x: z.number(),
-  y: z.number(),
+  col: z.number(),
+  row: z.number(),
 });
 
 export const messageSchema = z.union([newGame, move]);

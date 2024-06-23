@@ -30,5 +30,4 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('pointerup', (e) => {
   if (gameState.state !== 'playing') return;
   gameState.mouseClickCoords = { x: e.x, y: e.y };
-  console.log(gameState.mouseClickCoords);
 });
