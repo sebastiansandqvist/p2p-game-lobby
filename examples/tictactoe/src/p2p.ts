@@ -4,6 +4,8 @@ import { messageSchema, type Message } from './types';
 
 const p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
+  // TODO: prevent the user from joining a lobby if it's full. let them spectate instead? (how to do this without requiring interaction?)
+  // onSelfJoinedLobby({ peerIds }) {},
   async onPeerJoinedLobby({ sendOffer }) {
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-connect';

@@ -31,25 +31,21 @@ const server = Bun.serve<{ userId: string; lobbyId: string }>({
       console.log(`${userId} connected to lobby ${lobbyId}`);
 
       // 1. tell the new client that they're connected
-      reply({ kind: 'self-connected', id: userId });
-
-      // 2. tell the new client who else is in the lobby
+      //    and tell the new client who else is in the lobby
       const lobby = lobbies.get(lobbyId) ?? [];
-      for (const id of lobby) {
-        reply({ kind: 'connected', id });
-      }
+      reply({ kind: 'self-connected', id: userId, peerIds: lobby });
 
-      // 3. tell everyone else in the lobby that a new client has joined
+      // 2. tell everyone else in the lobby that a new client has joined
       {
         lobby.push(userId);
         lobbies.set(lobbyId, lobby);
         broadcast({ kind: 'connected', id: userId });
       }
 
-      // 4. subscribe the new client to all new lobby messages
+      // 3. subscribe the new client to all new lobby messages
       ws.subscribe(lobbyId);
 
-      // 5. subscribe to your own id so that others can send you direct messages
+      // 4. subscribe to your own id so that others can send you direct messages
       ws.subscribe(userId);
     },
     message(ws, rawMessage) {

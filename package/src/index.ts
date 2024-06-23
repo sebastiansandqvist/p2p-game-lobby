@@ -24,7 +24,7 @@ export function createPeerToPeer({
   /** eg. "wss://p2p-game-lobby.onrender.com" */
   websocketServerUrl: string;
   /** called when the current user has successfully connected to the lobby, allowing them to know their own id */
-  onSelfJoinedLobby?: (selfId: string) => void;
+  onSelfJoinedLobby?: ({ selfId, peerIds }: { selfId: string; peerIds: string[] }) => void;
   /** called when another user has connected to the lobby */
   onPeerJoinedLobby?: ({ peerId, sendOffer }: { peerId: string; sendOffer: () => Promise<void> }) => void;
   /** called when another has disconnected from the lobby */
@@ -122,7 +122,10 @@ export function createPeerToPeer({
     switch (wsMessage.kind) {
       case 'self-connected': {
         localState.id = wsMessage.id;
-        return onSelfJoinedLobby?.(localState.id);
+        return onSelfJoinedLobby?.({
+          selfId: wsMessage.id,
+          peerIds: wsMessage.peerIds,
+        });
       }
       case 'connected': {
         return onPeerJoinedLobby?.({

@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const selfConnectionMessageSchema = z.object({
   kind: z.literal('self-connected'),
   id: z.string(),
+  peerIds: z.array(z.string()),
 });
 
 export type SelfConnectionMessage = z.infer<typeof selfConnectionMessageSchema>;

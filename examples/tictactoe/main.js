@@ -3929,7 +3929,8 @@ var z = Object.freeze({
 // ../../package/src/types.ts
 var selfConnectionMessageSchema = z.object({
   kind: z.literal("self-connected"),
-  id: z.string()
+  id: z.string(),
+  peerIds: z.array(z.string())
 });
 var connectionMessageSchema = z.object({
   kind: z.literal("connected"),
@@ -4029,7 +4030,10 @@ function createPeerToPeer({
     switch (wsMessage.kind) {
       case "self-connected": {
         localState.id = wsMessage.id;
-        return onSelfJoinedLobby?.(localState.id);
+        return onSelfJoinedLobby?.({
+          selfId: wsMessage.id,
+          peerIds: wsMessage.peerIds
+        });
       }
       case "connected": {
         return onPeerJoinedLobby?.({
