@@ -8231,22 +8231,24 @@ var gameStateMessages = {
 };
 
 // src/main.ts
-var canvas = document.createElement("canvas");
-document.body.appendChild(canvas);
-var ctx = canvas.getContext("2d");
-var canvasRect = canvas.getBoundingClientRect();
-canvas.width = canvasRect.width * window.devicePixelRatio;
-canvas.height = canvasRect.height * window.devicePixelRatio;
-ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-drawGame(ctx, canvasRect);
-requestAnimationFrame(function render() {
-  const canvasRect2 = canvas.getBoundingClientRect();
-  canvas.width = canvasRect2.width * window.devicePixelRatio;
-  canvas.height = canvasRect2.height * window.devicePixelRatio;
+{
+  const canvas = document.createElement("canvas");
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext("2d");
+  const canvasRect = canvas.getBoundingClientRect();
+  canvas.width = canvasRect.width * window.devicePixelRatio;
+  canvas.height = canvasRect.height * window.devicePixelRatio;
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  drawGame(ctx, canvasRect2);
-  requestAnimationFrame(render);
-});
+  drawGame(ctx, canvasRect);
+  requestAnimationFrame(function render() {
+    const canvasRect2 = canvas.getBoundingClientRect();
+    canvas.width = canvasRect2.width * window.devicePixelRatio;
+    canvas.height = canvasRect2.height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    drawGame(ctx, canvasRect2);
+    requestAnimationFrame(render);
+  });
+}
 window.addEventListener("mousemove", (e) => {
   gameState.mouseCoords.x = e.x;
   gameState.mouseCoords.y = e.y;
