@@ -23,8 +23,14 @@ export function createPeerToPeer({
 }: {
   /** eg. "wss://p2p-game-lobby.onrender.com" */
   websocketServerUrl: string;
-  /** called when the current user has successfully connected to the lobby, allowing them to know their own id */
-  onSelfJoinedLobby?: ({ selfId, peerIds }: { selfId: string; peerIds: string[] }) => void;
+  /** called when the current user has successfully connected to the lobby, allowing them to know their own id and see who else is already in the lobby */
+  onSelfJoinedLobby?: ({
+    selfId,
+    peers,
+  }: {
+    selfId: string;
+    peers: { id: string; sendOffer: () => Promise<void> }[];
+  }) => void;
   /** called when another user has connected to the lobby */
   onPeerJoinedLobby?: ({ peerId, sendOffer }: { peerId: string; sendOffer: () => Promise<void> }) => void;
   /** called when another has disconnected from the lobby */
@@ -124,7 +130,21 @@ export function createPeerToPeer({
         localState.id = wsMessage.id;
         return onSelfJoinedLobby?.({
           selfId: wsMessage.id,
-          peerIds: wsMessage.peerIds,
+          peers: wsMessage.peerIds.map((id) => ({
+            id,
+            async sendOffer() {
+              debug?.('sending offer');
+              await peerConnection.setLocalDescription(await peerConnection.createOffer());
+              if (!localState.sdp) debug?.('waiting for local sdp');
+              const sdp = await awaitLocalSdp();
+              sendWsMessage({
+                kind: 'peer-offer',
+                toId: id,
+                fromId: wsMessage.id,
+                offer: { type: 'offer', sdp },
+              });
+            },
+          })),
         });
       }
       case 'connected': {

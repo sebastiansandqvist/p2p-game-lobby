@@ -4032,7 +4032,22 @@ function createPeerToPeer({
         localState.id = wsMessage.id;
         return onSelfJoinedLobby?.({
           selfId: wsMessage.id,
-          peerIds: wsMessage.peerIds
+          peers: wsMessage.peerIds.map((id) => ({
+            id,
+            async sendOffer() {
+              debug?.("sending offer");
+              await peerConnection.setLocalDescription(await peerConnection.createOffer());
+              if (!localState.sdp)
+                debug?.("waiting for local sdp");
+              const sdp = await awaitLocalSdp();
+              sendWsMessage({
+                kind: "peer-offer",
+                toId: id,
+                fromId: wsMessage.id,
+                offer: { type: "offer", sdp }
+              });
+            }
+          }))
         });
       }
       case "connected": {
@@ -8001,6 +8016,7 @@ var p2p = createPeerToPeer({
         return;
       gameState.state = "connecting";
       await sendOffer();
+      p2p.websocket.close();
     };
   },
   async onPeerOffer({ sendAnswer }) {
@@ -8008,6 +8024,7 @@ var p2p = createPeerToPeer({
       return;
     gameState.state = "click-to-play";
     await sendAnswer();
+    p2p.websocket.close();
     const priorClickHandler = window.onpointerup;
     window.onpointerup = async () => {
       window.onpointerup = priorClickHandler;

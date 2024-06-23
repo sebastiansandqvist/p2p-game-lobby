@@ -14,12 +14,14 @@ const p2p = createPeerToPeer({
       if (gameState.state !== 'click-to-connect') return;
       gameState.state = 'connecting';
       await sendOffer();
+      p2p.websocket.close();
     };
   },
   async onPeerOffer({ sendAnswer }) {
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-play';
     await sendAnswer(); // TODO: this probably needs to be in an onclick handler too?
+    p2p.websocket.close();
     const priorClickHandler = window.onpointerup; // TODO: something more elegant than this lol
     window.onpointerup = async () => {
       window.onpointerup = priorClickHandler;
