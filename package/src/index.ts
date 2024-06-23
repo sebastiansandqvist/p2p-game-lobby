@@ -1,5 +1,7 @@
 import { messageSchema, type Message } from './types';
 
+// TODO: add a latency test. some debug info to show roundtrip time.
+
 /** `createPeerToPeer`
   1. creates an immediate websocket connection to a server at websocketServerUrl,
      which must implement the server in server/server.ts.

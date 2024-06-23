@@ -4,5 +4,8 @@
   "scripts": {
     "build": "bun build ./src/main.ts --outdir .",
     "dev": "bun build --watch ./src/main.ts --outdir ."
+  },
+  "dependencies": {
+    "zod": "3.23.8"
   }
 }

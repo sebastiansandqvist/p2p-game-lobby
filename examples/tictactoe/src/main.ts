@@ -1,6 +1,8 @@
+import { initPeerToPeer } from './p2p';
 import { gameState } from './state';
 import { drawGame, hoverMove } from './tictactoe';
 
+// 1. initialize the canvas
 const canvas = document.createElement('canvas');
 document.body.appendChild(canvas);
 
@@ -20,3 +22,8 @@ window.onmousemove = (e) => {
   drawGame(ctx, canvasRect);
   hoverMove(ctx, canvasRect, { x: e.x, y: e.y }, gameState);
 };
+
+// 2. initialize the p2p connection
+initPeerToPeer(() => {
+  drawGame(ctx, canvasRect);
+});

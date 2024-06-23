@@ -1,14 +1,65 @@
 import { createPeerToPeer } from '../../../package/src';
+import { gameState } from './state';
+import { messageSchema, type Message } from './types';
 
-createPeerToPeer({
-  websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
-  onSelfConnected: (id) => {},
-  onPeerConnected: ({ peerId, sendOffer }) => {},
-  onPeerDisconnected: (peerId) => {},
-  onPeerOffer: ({ peerId, sendAnswer, sendMessage }) => {},
-  onPeerAnswer: ({ peerId, sendMessage }) => {},
-  onMessage(message) {},
-});
+const clientState = {
+  status: 'idle' as 'idle' | 'connecting' | 'playing',
+  sendMessage: null as ((message: Message) => void) | null,
+};
+
+export function initPeerToPeer(redraw: () => void) {
+  return createPeerToPeer({
+    websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
+    async onPeerConnected({ sendOffer }) {
+      if (clientState.status !== 'idle') return;
+      clientState.status = 'connecting';
+      await sendOffer();
+    },
+    async onPeerOffer({ sendAnswer, sendMessage }) {
+      if (clientState.status === 'playing') return;
+      clientState.status = 'connecting';
+      await sendAnswer();
+      clientState.sendMessage = (message) => sendMessage(JSON.stringify(message));
+      // clientState.sendMessage({
+      //   kind: 'new-game',
+      //   fromPlayer: Math.random() > 0.5 ? 'x' : 'o',
+      // });
+      clientState.status = 'playing';
+    },
+    onPeerAnswer({ sendMessage }) {
+      // clientState.sendMessage = (message) => sendMessage(JSON.stringify(message));
+      clientState.status = 'playing';
+    },
+    onMessage(rawMessage) {
+      const message = messageSchema.parse(JSON.parse(rawMessage));
+      switch (message.kind) {
+        case 'new-game': {
+          gameState.player = message.fromPlayer === 'x' ? 'o' : 'x';
+          gameState.xs = [];
+          gameState.os = [];
+          redraw();
+          break;
+        }
+        case 'move': {
+          const { x, y } = message;
+          if (message.fromPlayer === 'x') {
+            gameState.xs.push({ x, y });
+          } else {
+            gameState.os.push({ x, y });
+          }
+          redraw();
+          break;
+        }
+        default: {
+          console.error('unknown message kind', message);
+        }
+      }
+    },
+    debug(...args) {
+      console.log(...args);
+    },
+  });
+}
 
 function gameId() {
   const paramsGameId = new URLSearchParams(window.location.search).get('game');
@@ -19,5 +70,5 @@ function gameId() {
 }
 
 function randomId() {
-  (Math.random() * 100_000).toString().replace('.', '');
+  return (Math.random() * 100_000).toString().replace('.', '');
 }

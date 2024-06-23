@@ -48,7 +48,7 @@ export function hoverMove(
   if (cellHasPiece) return;
 
   if (!isCellInBounds(cell)) {
-    const lineWidth = 20;
+    const lineWidth = board.squareSize * 0.1;
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(
@@ -80,7 +80,7 @@ function drawX(
   const padding = board.squareSize * 0.3;
 
   ctx.strokeStyle = '#34d399';
-  ctx.lineWidth = 20;
+  ctx.lineWidth = board.squareSize * 0.1;
   ctx.beginPath();
   ctx.moveTo(cellX + padding, cellY + padding);
   ctx.lineTo(cellX - padding + board.squareSize, cellY - padding + board.squareSize);
@@ -98,7 +98,7 @@ function drawO(
   const cellY = board.y + board.squareSize * cell.y;
   const padding = board.squareSize * 0.25;
   ctx.strokeStyle = '#fbbf24';
-  ctx.lineWidth = 20;
+  ctx.lineWidth = board.squareSize * 0.1;
   ctx.beginPath();
   ctx.roundRect(
     cellX + padding,
@@ -115,7 +115,7 @@ function drawLines(
   board: { x: number; y: number; width: number; height: number; squareSize: number },
 ) {
   ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 20;
+  ctx.lineWidth = board.squareSize * 0.1;
   ctx.beginPath();
 
   // left vertical line
