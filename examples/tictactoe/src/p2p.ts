@@ -1,5 +1,5 @@
 import { createPeerToPeer } from '../../../package/src';
-import { gameState } from './state';
+import { gameOverLineOrState, gameState } from './state';
 import { messageSchema, type Message } from './types';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,6 +59,9 @@ createPeerToPeer({
           gameState.xs.push({ x, y });
         } else {
           gameState.os.push({ x, y });
+        }
+        if (gameOverLineOrState()) {
+          gameState.state = 'gameover';
         }
         break;
       }

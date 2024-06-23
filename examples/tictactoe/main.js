@@ -1,12 +1,68 @@
 // src/state.ts
+function gameOverLineOrState() {
+  for (const line of winningBoards) {
+    if (line.every((win) => gameState.xs.find((coord) => coord.x === win.x && coord.y === win.y) !== undefined)) {
+      return line;
+    }
+    if (line.every((win) => gameState.os.find((coord) => coord.x === win.x && coord.y === win.y) !== undefined)) {
+      return line;
+    }
+  }
+  if (gameState.xs.length === 5)
+    return true;
+  return false;
+}
 var gameState = {
   state: "idle",
   player: "x",
   mouseCoords: { x: 0, y: 0 },
   mouseClickCoords: null,
-  xs: [{ x: 1, y: 1 }],
-  os: [{ x: 0, y: 2 }]
+  xs: [],
+  os: []
 };
+window["gameState"] = gameState;
+var winningBoards = [
+  [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 2, y: 0 }
+  ],
+  [
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+    { x: 2, y: 1 }
+  ],
+  [
+    { x: 0, y: 2 },
+    { x: 1, y: 2 },
+    { x: 2, y: 2 }
+  ],
+  [
+    { x: 0, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: 2 }
+  ],
+  [
+    { x: 1, y: 0 },
+    { x: 1, y: 1 },
+    { x: 1, y: 2 }
+  ],
+  [
+    { x: 2, y: 0 },
+    { x: 2, y: 1 },
+    { x: 2, y: 2 }
+  ],
+  [
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
+    { x: 2, y: 2 }
+  ],
+  [
+    { x: 2, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 2 }
+  ]
+];
 
 // ../../node_modules/zod/lib/index.mjs
 var setErrorMap = function(map) {
@@ -7977,6 +8033,9 @@ createPeerToPeer({
         } else {
           gameState.os.push({ x, y });
         }
+        if (gameOverLineOrState()) {
+          gameState.state = "gameover";
+        }
         break;
       }
       default: {
@@ -8001,6 +8060,11 @@ function drawGame(ctx, canvasRect) {
   for (const { x, y } of gameState.os) {
     drawO(ctx, boardRect, { x, y });
   }
+  const gameOverLine = gameOverLineOrState();
+  if (Array.isArray(gameOverLine)) {
+    drawLine(ctx, boardRect, gameOverLine);
+    return;
+  }
   if (gameState.state !== "playing") {
     drawOverlay(ctx, canvasRect, gameStateMessages[gameState.state]);
     return;
@@ -8009,7 +8073,6 @@ function drawGame(ctx, canvasRect) {
   if (gameState.mouseClickCoords) {
     const cell = getCellUnderMouse(gameState.mouseClickCoords, boardRect);
     gameState.mouseClickCoords = null;
-    console.log(cell);
     const isOnBoard = cell.x >= 0 && cell.x <= 2 && cell.y >= 0 && cell.y <= 2;
     if (!isOnBoard)
       return;
@@ -8021,6 +8084,21 @@ function drawGame(ctx, canvasRect) {
       return;
     const moves = gameState.player === "x" ? gameState.xs : gameState.os;
     moves.push(cell);
+    const gameOverState = gameOverLineOrState();
+    if (gameOverState) {
+      gameState.state = "gameover";
+      setTimeout(() => {
+        gameState.state = "playing";
+        gameState.player = gameState.player === "x" ? "o" : "x";
+        gameState.mouseClickCoords = null;
+        gameState.xs = [];
+        gameState.os = [];
+        p2p.sendMessage?.({
+          kind: "new-game",
+          fromPlayer: gameState.player
+        });
+      }, 1000);
+    }
     p2p.sendMessage?.({
       kind: "move",
       fromPlayer: gameState.player,
@@ -8112,6 +8190,18 @@ var drawLines = function(ctx, board) {
   ctx.lineTo(board.x + board.width, board.y + board.squareSize * 2);
   ctx.stroke();
 };
+var drawLine = function(ctx, board, line) {
+  const centerOfStartX = board.x + line[0].x * board.squareSize + board.squareSize / 2;
+  const centerOfStartY = board.y + line[0].y * board.squareSize + board.squareSize / 2;
+  const centerOfEndX = board.x + line[2].x * board.squareSize + board.squareSize / 2;
+  const centerOfEndY = board.y + line[2].y * board.squareSize + board.squareSize / 2;
+  ctx.strokeStyle = "#e11d48";
+  ctx.lineWidth = board.squareSize * 0.1;
+  ctx.beginPath();
+  ctx.moveTo(centerOfStartX, centerOfStartY);
+  ctx.lineTo(centerOfEndX, centerOfEndY);
+  ctx.stroke();
+};
 var calculateBoardRect = function(availableSpace) {
   const basis = Math.min(availableSpace.width, availableSpace.height);
   const minMargin = basis * 0.1;
@@ -8131,7 +8221,8 @@ var gameStateMessages = {
   "click-to-play": "Click anywhere to play.",
   "waiting-for-first-move": "Waiting for other player to make a move.",
   connecting: "Connecting...",
-  playing: ""
+  playing: "",
+  gameover: "Draw!"
 };
 
 // src/main.ts

@@ -1,5 +1,5 @@
 import { p2p } from './p2p';
-import { gameState } from './state';
+import { gameState, gameOverLineOrState } from './state';
 
 const gameStateMessages = {
   'idle': 'Waiting for another player. Share your url!',
@@ -8,6 +8,7 @@ const gameStateMessages = {
   'waiting-for-first-move': 'Waiting for other player to make a move.',
   'connecting': 'Connecting...',
   'playing': '',
+  'gameover': 'Draw!', // we'll only display this gameover state if there is no winning line
 };
 
 export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
@@ -25,6 +26,12 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
     drawO(ctx, boardRect, { x, y });
   }
 
+  const gameOverLine = gameOverLineOrState();
+  if (Array.isArray(gameOverLine)) {
+    drawLine(ctx, boardRect, gameOverLine);
+    return;
+  }
+
   if (gameState.state !== 'playing') {
     drawOverlay(ctx, canvasRect, gameStateMessages[gameState.state]);
     return;
@@ -35,8 +42,6 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
   if (gameState.mouseClickCoords) {
     const cell = getCellUnderMouse(gameState.mouseClickCoords, boardRect);
     gameState.mouseClickCoords = null;
-
-    console.log(cell);
 
     const isOnBoard = cell.x >= 0 && cell.x <= 2 && cell.y >= 0 && cell.y <= 2;
     if (!isOnBoard) return;
@@ -54,6 +59,22 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
 
     const moves = gameState.player === 'x' ? gameState.xs : gameState.os;
     moves.push(cell);
+
+    const gameOverState = gameOverLineOrState();
+    if (gameOverState) {
+      gameState.state = 'gameover';
+      setTimeout(() => {
+        gameState.state = 'playing';
+        gameState.player = gameState.player === 'x' ? 'o' : 'x';
+        gameState.mouseClickCoords = null;
+        gameState.xs = [];
+        gameState.os = [];
+        p2p.sendMessage?.({
+          kind: 'new-game',
+          fromPlayer: gameState.player,
+        });
+      }, 1000);
+    }
 
     p2p.sendMessage?.({
       kind: 'move',
@@ -196,6 +217,24 @@ function drawLines(
   ctx.moveTo(board.x, board.y + board.squareSize * 2);
   ctx.lineTo(board.x + board.width, board.y + board.squareSize * 2);
 
+  ctx.stroke();
+}
+
+function drawLine(
+  ctx: CanvasRenderingContext2D,
+  board: { x: number; y: number; width: number; height: number; squareSize: number },
+  line: { x: number; y: number }[],
+) {
+  const centerOfStartX = board.x + line[0].x * board.squareSize + board.squareSize / 2;
+  const centerOfStartY = board.y + line[0].y * board.squareSize + board.squareSize / 2;
+  const centerOfEndX = board.x + line[2].x * board.squareSize + board.squareSize / 2;
+  const centerOfEndY = board.y + line[2].y * board.squareSize + board.squareSize / 2;
+
+  ctx.strokeStyle = '#e11d48';
+  ctx.lineWidth = board.squareSize * 0.1;
+  ctx.beginPath();
+  ctx.moveTo(centerOfStartX, centerOfStartY);
+  ctx.lineTo(centerOfEndX, centerOfEndY);
   ctx.stroke();
 }
 
