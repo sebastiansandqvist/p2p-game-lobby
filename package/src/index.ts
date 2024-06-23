@@ -1,6 +1,7 @@
 import { messageSchema, type Message } from './types';
 
-// TODO: add a latency test. some debug info to show roundtrip time.
+// TODO: add a latency test. some debug info to show roundtrip time
+// (for both the ws and p2p connections.)
 
 /** `createPeerToPeer`
   1. creates an immediate websocket connection to a server at websocketServerUrl,

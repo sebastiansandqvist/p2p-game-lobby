@@ -8005,7 +8005,7 @@ var p2p = createPeerToPeer({
     gameState.state = "click-to-play";
     await sendAnswer();
     const priorClickHandler = window.onpointerup;
-    window.onpointerup = () => {
+    window.onpointerup = async () => {
       window.onpointerup = priorClickHandler;
       gameState.state = "playing";
       gameState.player = "x";
