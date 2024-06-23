@@ -1,0 +1,8 @@
+{
+  "name": "peer-to-peer-example-tictactoe",
+  "private": true,
+  "scripts": {
+    "build": "bun build ./src/main.ts --outdir .",
+    "dev": "bun build --watch ./src/main.ts --outdir ."
+  }
+}
