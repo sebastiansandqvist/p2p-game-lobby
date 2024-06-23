@@ -12,18 +12,22 @@ canvas.width = canvasRect.width * window.devicePixelRatio;
 canvas.height = canvasRect.height * window.devicePixelRatio;
 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-window.onresize = () => {
-  drawGame(ctx, canvasRect);
-};
+// TODO: why does this not work?
+// window.onresize = () => {
+//   canvas.width = canvasRect.width * window.devicePixelRatio;
+//   canvas.height = canvasRect.height * window.devicePixelRatio;
+//   drawGame(ctx, canvas.getBoundingClientRect());
+// };
 
 drawGame(ctx, canvasRect);
 
 window.onmousemove = (e) => {
-  drawGame(ctx, canvasRect);
-  hoverMove(ctx, canvasRect, { x: e.x, y: e.y }, gameState);
+  drawGame(ctx, canvas.getBoundingClientRect());
+  hoverMove(ctx, canvas.getBoundingClientRect(), { x: e.x, y: e.y }, gameState);
 };
 
 // 2. initialize the p2p connection
-initPeerToPeer(() => {
-  drawGame(ctx, canvasRect);
-});
+// TODO: fix this.
+// initPeerToPeer(() => {
+//   drawGame(ctx, canvasRect);
+// });
