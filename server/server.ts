@@ -1,5 +1,8 @@
 import { messageSchema, type Message } from '../package/src/types';
 
+// possible (opinionated) improvement:
+//  - as soon as a handshake is complete, disconnect the two parties from the server
+
 const lobbies = new Map<string, string[]>();
 
 const server = Bun.serve<{ userId: string; lobbyId: string }>({

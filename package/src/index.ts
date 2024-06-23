@@ -1,14 +1,14 @@
 import { messageSchema, type Message } from './types';
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** `createPeerToPeer`
+  1. creates an immediate websocket connection to a server at websocketServerUrl,
+     which must implement the server in server/server.ts.
+  2. sets up a RTCPeerConnection with a data channel
+  3. returns hooks and methods to allow users to connect to one another p2p, using
+     the websocket connection to facilitate the handshake.
 
-// list of free STUN servers: https://gist.github.com/zziuni/3741933
-// GLOSSARY:
-// - STUN: Session Traversal Utilities for NAT
-// - TURN: Traversal Using Relay around NAT
-// - ICE: Interactive Connectivity Establishment
-
-/** returns a cleanup function */
+  (returns a cleanup function to close all connections)
+*/
 export function createPeerToPeer({
   websocketServerUrl,
   onSelfConnected,
@@ -17,6 +17,7 @@ export function createPeerToPeer({
   onPeerOffer,
   onPeerAnswer,
   onMessage,
+  getRawResources,
 }: {
   /** eg. "wss://p2p-game-lobby.onrender.com" */
   websocketServerUrl: string;
@@ -46,7 +47,14 @@ export function createPeerToPeer({
     channel: RTCDataChannel;
     sendMessage: (message: string) => void;
   }) => void;
+  /** called when another user who you are connected to p2p sends a message to you */
   onMessage?: (message: string) => void;
+  /** if this API is missing anything, use the underlying resources to do it yourself */
+  getRawResources?: (resources: {
+    websocket: WebSocket;
+    peerConnection: RTCPeerConnection;
+    dataChannel: RTCDataChannel;
+  }) => void;
 }) {
   const ws = new WebSocket(websocketServerUrl);
   const peerConnection = new RTCPeerConnection({
@@ -63,6 +71,8 @@ export function createPeerToPeer({
     ],
   });
   const channel = peerConnection.createDataChannel('lobby', { id: 0, negotiated: true });
+
+  getRawResources?.({ websocket: ws, peerConnection, dataChannel: channel });
 
   const sendMessage = (message: string) => channel.send(message);
   channel.onmessage = (e) => onMessage?.(e.data);
@@ -151,22 +161,9 @@ export function createPeerToPeer({
     }
   };
 
-  /*
-    peerConnection.oniceconnectionstatechange = () => {
-      console.log('ICE Connection State Change:', peerConnection.iceConnectionState);
-    };
-
-    peerConnection.onsignalingstatechange = () => {
-      console.log('Signaling State Change:', peerConnection.signalingState, peerConnection);
-    };
-
-    peerConnection.ondatachannel = (event) => {
-      console.log('Data Channel:', event.channel, event);
-    };
-  */
-
   return () => {
     ws.close();
+    channel.close();
     peerConnection.close();
   };
 }
