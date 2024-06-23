@@ -1,6 +1,5 @@
-import { initPeerToPeer } from './p2p';
 import { gameState } from './state';
-import { drawGame, hoverMove } from './tictactoe';
+import { drawGame } from './tictactoe';
 
 // 1. initialize the canvas
 const canvas = document.createElement('canvas');
@@ -12,22 +11,24 @@ canvas.width = canvasRect.width * window.devicePixelRatio;
 canvas.height = canvasRect.height * window.devicePixelRatio;
 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-// TODO: why does this not work?
-// window.onresize = () => {
-//   canvas.width = canvasRect.width * window.devicePixelRatio;
-//   canvas.height = canvasRect.height * window.devicePixelRatio;
-//   drawGame(ctx, canvas.getBoundingClientRect());
-// };
-
 drawGame(ctx, canvasRect);
 
-window.onmousemove = (e) => {
-  drawGame(ctx, canvas.getBoundingClientRect());
-  hoverMove(ctx, canvas.getBoundingClientRect(), { x: e.x, y: e.y }, gameState);
-};
+requestAnimationFrame(function render() {
+  const canvasRect = canvas.getBoundingClientRect();
+  canvas.width = canvasRect.width * window.devicePixelRatio;
+  canvas.height = canvasRect.height * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  drawGame(ctx, canvasRect);
+  requestAnimationFrame(render);
+});
 
-// 2. initialize the p2p connection
-// TODO: fix this.
-// initPeerToPeer(() => {
-//   drawGame(ctx, canvasRect);
-// });
+window.addEventListener('mousemove', (e) => {
+  gameState.mouseCoords.x = e.x;
+  gameState.mouseCoords.y = e.y;
+});
+
+window.addEventListener('click', (e) => {
+  if (gameState.state !== 'playing') return;
+  gameState.pendingMove = { x: e.x, y: e.y };
+  console.log(gameState.pendingMove);
+});

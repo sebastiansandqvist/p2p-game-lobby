@@ -1,4 +1,14 @@
+import { p2p } from './p2p';
 import { gameState } from './state';
+
+const gameStateMessages = {
+  'idle': 'Waiting for another player. Share your url!',
+  'click-to-connect': 'Click anywhere to connect.',
+  'click-to-play': 'Click anywhere to play.',
+  'waiting-for-first-move': 'Waiting for other player to make a move.',
+  'connecting': 'Connecting...',
+  'playing': '',
+};
 
 export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
   ctx.fillStyle = '#000';
@@ -14,10 +24,48 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
   for (const { x, y } of gameState.os) {
     drawO(ctx, boardRect, { x, y });
   }
+
+  if (gameState.state !== 'playing') {
+    drawOverlay(ctx, canvasRect, gameStateMessages[gameState.state]);
+    return;
+  }
+
+  hoverMove(ctx, canvasRect, gameState);
+
+  if (gameState.pendingMove) {
+    const cell = getCellUnderMouse(gameState.pendingMove, boardRect);
+    gameState.pendingMove = null;
+
+    console.log(cell);
+
+    const isOnBoard = cell.x >= 0 && cell.x <= 2 && cell.y >= 0 && cell.y <= 2;
+    if (!isOnBoard) return;
+
+    const isUnplayed =
+      gameState.xs.every(({ x, y }) => x !== cell.x || y !== cell.y) &&
+      gameState.os.every(({ x, y }) => x !== cell.x || y !== cell.y);
+    if (!isUnplayed) return;
+
+    const isCurrentPlayerTurn =
+      gameState.player === 'x'
+        ? gameState.xs.length === gameState.os.length
+        : gameState.xs.length > gameState.os.length;
+    if (!isCurrentPlayerTurn) return;
+
+    const moves = gameState.player === 'x' ? gameState.xs : gameState.os;
+    moves.push(cell);
+
+    p2p.sendMessage?.({
+      kind: 'move',
+      fromPlayer: gameState.player,
+      x: cell.x,
+      y: cell.y,
+    });
+  }
 }
 
 // unclamped values; could go negative or larger than 2 for both x and y
-function getCellUnderMouse(
+export function getCellUnderMouse(
   mouse: { x: number; y: number },
   boardRect: { x: number; y: number; width: number; height: number; squareSize: number },
 ) {
@@ -33,11 +81,10 @@ function isCellInBounds({ x, y }: { x: number; y: number }) {
 export function hoverMove(
   ctx: CanvasRenderingContext2D,
   canvasRect: DOMRect,
-  mouse: { x: number; y: number },
   gameState: typeof import('./state').gameState,
 ) {
   const board = calculateBoardRect(canvasRect);
-  const cell = getCellUnderMouse(mouse, board);
+  const cell = getCellUnderMouse(gameState.mouseCoords, board);
   const cellX = board.x + board.squareSize * cell.x;
   const cellY = board.y + board.squareSize * cell.y;
 
@@ -49,7 +96,6 @@ export function hoverMove(
 
   if (!isCellInBounds(cell)) {
     const lineWidth = board.squareSize * 0.1;
-    ctx.globalAlpha = 0.5;
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(
       cellX + lineWidth / 2,
@@ -57,7 +103,6 @@ export function hoverMove(
       board.squareSize - lineWidth,
       board.squareSize - lineWidth,
     );
-    ctx.globalAlpha = 1;
     return;
   }
 
@@ -65,6 +110,11 @@ export function hoverMove(
   if (gameState.player === 'x') {
     if (!gameState.os.some(({ x, y }) => x === cell.x && y === cell.y)) {
       drawX(ctx, board, cell);
+    }
+  }
+  if (gameState.player === 'o') {
+    if (!gameState.xs.some(({ x, y }) => x === cell.x && y === cell.y)) {
+      drawO(ctx, board, cell);
     }
   }
   ctx.globalAlpha = 1;
@@ -110,6 +160,18 @@ function drawO(
   ctx.stroke();
 }
 
+export function drawOverlay(ctx: CanvasRenderingContext2D, canvasRect: DOMRect, message: string) {
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
+  ctx.globalAlpha = 1;
+  ctx.font = 'bold 16px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(message, canvasRect.width / 2, canvasRect.height / 2);
+}
+
 function drawLines(
   ctx: CanvasRenderingContext2D,
   board: { x: number; y: number; width: number; height: number; squareSize: number },
@@ -138,14 +200,13 @@ function drawLines(
 }
 
 function calculateBoardRect(availableSpace: DOMRect) {
-  const minMargin = availableSpace.width * 0.05;
+  const basis = Math.min(availableSpace.width, availableSpace.height);
+  const minMargin = basis * 0.1;
   const boardSize = Math.min((availableSpace.width - 2 * minMargin) / 2, availableSpace.height - 2 * minMargin);
-  const hSpace = (availableSpace.width - boardSize) / 2;
-  const vSpace = (availableSpace.height - boardSize) / 2;
 
   const boardRect = {
-    x: hSpace,
-    y: vSpace,
+    x: (availableSpace.width - boardSize) / 2,
+    y: (availableSpace.height - boardSize) / 2,
     width: boardSize,
     height: boardSize,
     squareSize: boardSize / 3,

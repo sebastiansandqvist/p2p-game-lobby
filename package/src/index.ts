@@ -77,8 +77,14 @@ export function createPeerToPeer({
   });
   const channel = peerConnection.createDataChannel('lobby', { id: 0, negotiated: true });
 
-  const sendMessage = (message: string) => channel.send(message);
-  channel.onmessage = (e) => onMessage?.(e.data);
+  const sendMessage = (message: string) => {
+    debug?.('sending message', message);
+    channel.send(message);
+  };
+  channel.onmessage = (e) => {
+    debug?.('got message', e.data);
+    onMessage?.(e.data);
+  };
 
   getRawResources?.({ websocket: ws, peerConnection, dataChannel: channel });
 
