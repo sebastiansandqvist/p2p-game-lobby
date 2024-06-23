@@ -18,3 +18,10 @@ services:
     runtime: static
     pullRequestPreviewsEnabled: false
     staticPublishPath: ./examples/basic
+
+  - type: web
+    name: p2p-tictactoe-lobby
+    buildCommand: bun i && cd examples/tictactoe && bun run build
+    runtime: static
+    pullRequestPreviewsEnabled: false
+    staticPublishPath: ./examples/tictactoe
