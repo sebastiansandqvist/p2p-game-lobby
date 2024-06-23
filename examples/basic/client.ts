@@ -5,8 +5,21 @@ const lobbyId = prompt('which lobby do you want to join?');
 
 createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/${lobbyId ?? 'shared'}`,
-  onSelfJoinedLobby: ({ selfId, peerIds }) => {
-    console.log('self connected', selfId, peerIds);
+  onSelfJoinedLobby: ({ selfId, peers }) => {
+    console.log('self connected', selfId, peers);
+    for (const peer of peers) {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.textContent = 'request';
+      button.onclick = async () => {
+        button.disabled = true;
+        await peer.sendOffer();
+      };
+      li.dataset['id'] = peer.id;
+      li.appendChild(button);
+      li.appendChild(document.createTextNode(peer.id));
+      lobby.appendChild(li);
+    }
   },
   onPeerJoinedLobby: ({ peerId, sendOffer }) => {
     const li = document.createElement('li');
