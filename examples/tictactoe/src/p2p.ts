@@ -4,7 +4,7 @@ import { messageSchema, type Message } from './types';
 
 const p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
-  async onPeerConnected({ sendOffer }) {
+  async onPeerJoinedLobby({ sendOffer }) {
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-connect';
     window.onpointerup = async () => {

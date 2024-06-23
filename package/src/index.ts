@@ -11,9 +11,9 @@ import { messageSchema, type Message } from './types';
 */
 export function createPeerToPeer({
   websocketServerUrl,
-  onSelfConnected,
-  onPeerConnected,
-  onPeerDisconnected,
+  onSelfJoinedLobby,
+  onPeerJoinedLobby,
+  onPeerLeftLobby,
   onPeerOffer,
   onPeerAnswer,
   onMessage,
@@ -23,11 +23,11 @@ export function createPeerToPeer({
   /** eg. "wss://p2p-game-lobby.onrender.com" */
   websocketServerUrl: string;
   /** called when the current user has successfully connected to the lobby, allowing them to know their own id */
-  onSelfConnected?: (selfId: string) => void;
+  onSelfJoinedLobby?: (selfId: string) => void;
   /** called when another user has connected to the lobby */
-  onPeerConnected?: ({ peerId, sendOffer }: { peerId: string; sendOffer: () => Promise<void> }) => void;
+  onPeerJoinedLobby?: ({ peerId, sendOffer }: { peerId: string; sendOffer: () => Promise<void> }) => void;
   /** called when another has disconnected from the lobby */
-  onPeerDisconnected?: (peerId: string) => void;
+  onPeerLeftLobby?: (peerId: string) => void;
   /** called when another user has sent a p2p connection offer to the current user */
   onPeerOffer?: ({
     peerId,
@@ -121,10 +121,10 @@ export function createPeerToPeer({
     switch (wsMessage.kind) {
       case 'self-connected': {
         localState.id = wsMessage.id;
-        return onSelfConnected?.(localState.id);
+        return onSelfJoinedLobby?.(localState.id);
       }
       case 'connected': {
-        return onPeerConnected?.({
+        return onPeerJoinedLobby?.({
           peerId: wsMessage.id,
           async sendOffer() {
             debug?.('sending offer');
@@ -141,7 +141,7 @@ export function createPeerToPeer({
         });
       }
       case 'disconnected': {
-        return onPeerDisconnected?.(wsMessage.id);
+        return onPeerLeftLobby?.(wsMessage.id);
       }
       case 'peer-offer': {
         await peerConnection.setRemoteDescription({ type: 'offer', sdp: wsMessage.offer.sdp });
@@ -175,6 +175,7 @@ export function createPeerToPeer({
   };
 
   return {
+    /** `sendMessage` will throw an error if the peer connection is not properly established */
     sendMessage,
     websocket: ws,
     channel,

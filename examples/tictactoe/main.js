@@ -3966,9 +3966,9 @@ var messageSchema = z.union([
 // ../../package/src/index.ts
 function createPeerToPeer({
   websocketServerUrl,
-  onSelfConnected,
-  onPeerConnected,
-  onPeerDisconnected,
+  onSelfJoinedLobby,
+  onPeerJoinedLobby,
+  onPeerLeftLobby,
   onPeerOffer,
   onPeerAnswer,
   onMessage,
@@ -4029,10 +4029,10 @@ function createPeerToPeer({
     switch (wsMessage.kind) {
       case "self-connected": {
         localState.id = wsMessage.id;
-        return onSelfConnected?.(localState.id);
+        return onSelfJoinedLobby?.(localState.id);
       }
       case "connected": {
-        return onPeerConnected?.({
+        return onPeerJoinedLobby?.({
           peerId: wsMessage.id,
           async sendOffer() {
             debug?.("sending offer");
@@ -4050,7 +4050,7 @@ function createPeerToPeer({
         });
       }
       case "disconnected": {
-        return onPeerDisconnected?.(wsMessage.id);
+        return onPeerLeftLobby?.(wsMessage.id);
       }
       case "peer-offer": {
         await peerConnection.setRemoteDescription({ type: "offer", sdp: wsMessage.offer.sdp });
@@ -7987,7 +7987,7 @@ var randomId = function() {
 };
 var p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
-  async onPeerConnected({ sendOffer }) {
+  async onPeerJoinedLobby({ sendOffer }) {
     if (gameState.state === "playing")
       return;
     gameState.state = "click-to-connect";
