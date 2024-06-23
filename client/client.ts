@@ -46,6 +46,10 @@ createPeerToPeer({
       submitButton.textContent = 'send';
       submitButton.onclick = () => {
         sendMessage(input.value);
+        const div = document.createElement('div') as HTMLDivElement;
+        div.textContent = input.value;
+        div.style.color = 'blue';
+        document.body.appendChild(div);
         input.value = '';
         input.focus();
       };
@@ -66,6 +70,10 @@ createPeerToPeer({
     input.onkeydown = (e) => {
       if (e.key === 'Enter') {
         sendMessage(input.value);
+        const div = document.createElement('div') as HTMLDivElement;
+        div.textContent = input.value;
+        div.style.color = 'blue';
+        document.body.appendChild(div);
         input.value = '';
       }
     };
