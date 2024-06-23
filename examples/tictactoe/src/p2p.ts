@@ -14,8 +14,8 @@ createPeerToPeer({
   async onPeerConnected({ sendOffer }) {
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-connect';
-    window.onclick = async () => {
-      window.onclick = null;
+    window.onpointerup = async () => {
+      window.onpointerup = null;
       if (gameState.state !== 'click-to-connect') return;
       gameState.state = 'connecting';
       await sendOffer();
@@ -25,9 +25,9 @@ createPeerToPeer({
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-play';
     await sendAnswer();
-    const priorClickHandler = window.onclick;
-    window.onclick = () => {
-      window.onclick = priorClickHandler;
+    const priorClickHandler = window.onpointerup;
+    window.onpointerup = () => {
+      window.onpointerup = priorClickHandler;
       p2p.sendMessage = (message) => sendMessage(JSON.stringify(message));
       gameState.state = 'playing';
       gameState.player = 'x';
