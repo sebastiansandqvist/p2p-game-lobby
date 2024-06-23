@@ -3,7 +3,7 @@ var gameState = {
   state: "idle",
   player: "x",
   mouseCoords: { x: 0, y: 0 },
-  pendingMove: null,
+  mouseClickCoords: null,
   xs: [{ x: 1, y: 1 }],
   os: [{ x: 0, y: 2 }]
 };
@@ -8006,9 +8006,9 @@ function drawGame(ctx, canvasRect) {
     return;
   }
   hoverMove(ctx, canvasRect, gameState);
-  if (gameState.pendingMove) {
-    const cell = getCellUnderMouse(gameState.pendingMove, boardRect);
-    gameState.pendingMove = null;
+  if (gameState.mouseClickCoords) {
+    const cell = getCellUnderMouse(gameState.mouseClickCoords, boardRect);
+    gameState.mouseClickCoords = null;
     console.log(cell);
     const isOnBoard = cell.x >= 0 && cell.x <= 2 && cell.y >= 0 && cell.y <= 2;
     if (!isOnBoard)
@@ -8158,6 +8158,6 @@ window.addEventListener("mousemove", (e) => {
 window.addEventListener("click", (e) => {
   if (gameState.state !== "playing")
     return;
-  gameState.pendingMove = { x: e.x, y: e.y };
-  console.log(gameState.pendingMove);
+  gameState.mouseClickCoords = { x: e.x, y: e.y };
+  console.log(gameState.mouseClickCoords);
 });

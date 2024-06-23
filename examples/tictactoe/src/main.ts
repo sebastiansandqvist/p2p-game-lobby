@@ -29,6 +29,6 @@ window.addEventListener('mousemove', (e) => {
 
 window.addEventListener('click', (e) => {
   if (gameState.state !== 'playing') return;
-  gameState.pendingMove = { x: e.x, y: e.y };
-  console.log(gameState.pendingMove);
+  gameState.mouseClickCoords = { x: e.x, y: e.y };
+  console.log(gameState.mouseClickCoords);
 });

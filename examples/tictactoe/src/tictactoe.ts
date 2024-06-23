@@ -32,9 +32,9 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
 
   hoverMove(ctx, canvasRect, gameState);
 
-  if (gameState.pendingMove) {
-    const cell = getCellUnderMouse(gameState.pendingMove, boardRect);
-    gameState.pendingMove = null;
+  if (gameState.mouseClickCoords) {
+    const cell = getCellUnderMouse(gameState.mouseClickCoords, boardRect);
+    gameState.mouseClickCoords = null;
 
     console.log(cell);
 
