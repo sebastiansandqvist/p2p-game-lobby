@@ -15,7 +15,7 @@ function gameOverLineOrState() {
 var gameState = {
   state: "idle",
   player: "x",
-  mouseCoords: { x: 0, y: 0 },
+  mouseCoords: { x: -999, y: -999 },
   mouseClickCoords: null,
   xs: [],
   os: []

@@ -8,7 +8,7 @@ export const gameState = {
     | 'playing'
     | 'gameover',
   player: 'x' as 'x' | 'o',
-  mouseCoords: { x: 0, y: 0 }, // x and y are in px values, not [0, 2]
+  mouseCoords: { x: -999, y: -999 }, // x and y are in px values, not [0, 2] -- just starting somewhere offscreen so mobile users don't see a weird square
   mouseClickCoords: null as { x: number; y: number } | null, // also px values
   xs: [] as { x: number; y: number }[],
   os: [] as { x: number; y: number }[],
