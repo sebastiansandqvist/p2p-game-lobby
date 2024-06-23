@@ -4,6 +4,7 @@ import { messageSchema, type Message } from './types';
 
 const clientState = {
   status: 'idle' as 'idle' | 'connecting' | 'playing',
+  // TODO: come up with a better api. it's annoying to have to set sendMessage outside of the context of the p2p stuff
   sendMessage: null as ((message: Message) => void) | null,
 };
 
