@@ -1,4 +1,4 @@
-import { createPeerToPeer } from '../package/src';
+import { createPeerToPeer } from '../../package/src';
 
 const lobby = document.getElementById('lobby') as HTMLUListElement;
 const lobbyId = prompt('which lobby do you want to join?');

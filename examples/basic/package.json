@@ -1,0 +1,8 @@
+{
+  "name": "peer-to-peer-example-basic",
+  "private": true,
+  "scripts": {
+    "build": "bun build ./client.ts --outdir .",
+    "dev": "bun build --watch ./client.ts --outdir ."
+  }
+}
