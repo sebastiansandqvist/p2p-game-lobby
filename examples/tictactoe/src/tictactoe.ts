@@ -1,4 +1,4 @@
-import { p2p } from './p2p';
+import { sendMessage } from './p2p';
 import { gameState, gameOverLineOrState } from './state';
 
 const gameStateMessages = {
@@ -69,14 +69,14 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
         gameState.mouseClickCoords = null;
         gameState.xs = [];
         gameState.os = [];
-        p2p.sendMessage?.({
+        sendMessage({
           kind: 'new-game',
           fromPlayer: gameState.player,
         });
       }, 1000);
     }
 
-    p2p.sendMessage?.({
+    sendMessage({
       kind: 'move',
       fromPlayer: gameState.player,
       x: cell.x,

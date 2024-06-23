@@ -8,8 +8,6 @@ import { messageSchema, type Message } from './types';
   2. sets up a RTCPeerConnection with a data channel
   3. returns hooks and methods to allow users to connect to one another p2p, using
      the websocket connection to facilitate the handshake.
-
-  (returns a cleanup function to close all connections)
 */
 export function createPeerToPeer({
   websocketServerUrl,
@@ -176,9 +174,15 @@ export function createPeerToPeer({
     }
   };
 
-  return () => {
-    ws.close();
-    channel.close();
-    peerConnection.close();
+  return {
+    sendMessage,
+    websocket: ws,
+    channel,
+    peerConnection,
+    cleanup() {
+      ws.close();
+      channel.close();
+      peerConnection.close();
+    },
   };
 }

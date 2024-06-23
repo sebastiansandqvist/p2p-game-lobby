@@ -4082,10 +4082,16 @@ function createPeerToPeer({
       }
     }
   };
-  return () => {
-    ws.close();
-    channel.close();
-    peerConnection.close();
+  return {
+    sendMessage,
+    websocket: ws,
+    channel,
+    peerConnection,
+    cleanup() {
+      ws.close();
+      channel.close();
+      peerConnection.close();
+    }
   };
 }
 
@@ -7965,6 +7971,9 @@ var move = z2.object({
 var messageSchema2 = z2.union([newGame, move]);
 
 // src/p2p.ts
+function sendMessage(message) {
+  p2p.sendMessage(JSON.stringify(message));
+}
 var gameId = function() {
   const paramsGameId = new URLSearchParams(window.location.search).get("game");
   if (paramsGameId)
@@ -7976,10 +7985,7 @@ var gameId = function() {
 var randomId = function() {
   return (Math.random() * 1e5).toString().replace(".", "");
 };
-var p2p = {
-  sendMessage: null
-};
-createPeerToPeer({
+var p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
   async onPeerConnected({ sendOffer }) {
     if (gameState.state === "playing")
@@ -7993,7 +7999,7 @@ createPeerToPeer({
       await sendOffer();
     };
   },
-  async onPeerOffer({ sendAnswer, sendMessage }) {
+  async onPeerOffer({ sendAnswer }) {
     if (gameState.state === "playing")
       return;
     gameState.state = "click-to-play";
@@ -8001,19 +8007,17 @@ createPeerToPeer({
     const priorClickHandler = window.onpointerup;
     window.onpointerup = () => {
       window.onpointerup = priorClickHandler;
-      p2p.sendMessage = (message) => sendMessage(JSON.stringify(message));
       gameState.state = "playing";
       gameState.player = "x";
       gameState.xs = [];
       gameState.os = [];
-      p2p.sendMessage?.({
+      sendMessage({
         kind: "new-game",
         fromPlayer: "x"
       });
     };
   },
-  onPeerAnswer({ sendMessage }) {
-    p2p.sendMessage = (message) => sendMessage(JSON.stringify(message));
+  onPeerAnswer() {
     gameState.state = "waiting-for-first-move";
   },
   onMessage(rawMessage) {
@@ -8093,13 +8097,13 @@ function drawGame(ctx, canvasRect) {
         gameState.mouseClickCoords = null;
         gameState.xs = [];
         gameState.os = [];
-        p2p.sendMessage?.({
+        sendMessage({
           kind: "new-game",
           fromPlayer: gameState.player
         });
       }, 1000);
     }
-    p2p.sendMessage?.({
+    sendMessage({
       kind: "move",
       fromPlayer: gameState.player,
       x: cell.x,

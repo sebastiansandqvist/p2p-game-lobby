@@ -2,14 +2,7 @@ import { createPeerToPeer } from '../../../package/src';
 import { gameOverLineOrState, gameState } from './state';
 import { messageSchema, type Message } from './types';
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-export const p2p = {
-  // TODO: come up with a better api. it's annoying to have to set sendMessage outside of the context of the p2p stuff
-  sendMessage: null as ((message: Message) => void) | null,
-};
-
-createPeerToPeer({
+const p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
   async onPeerConnected({ sendOffer }) {
     if (gameState.state === 'playing') return;
@@ -21,26 +14,24 @@ createPeerToPeer({
       await sendOffer();
     };
   },
-  async onPeerOffer({ sendAnswer, sendMessage }) {
+  async onPeerOffer({ sendAnswer }) {
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-play';
     await sendAnswer();
     const priorClickHandler = window.onpointerup;
     window.onpointerup = () => {
       window.onpointerup = priorClickHandler;
-      p2p.sendMessage = (message) => sendMessage(JSON.stringify(message));
       gameState.state = 'playing';
       gameState.player = 'x';
       gameState.xs = [];
       gameState.os = [];
-      p2p.sendMessage?.({
+      sendMessage({
         kind: 'new-game',
         fromPlayer: 'x',
       });
     };
   },
-  onPeerAnswer({ sendMessage }) {
-    p2p.sendMessage = (message) => sendMessage(JSON.stringify(message));
+  onPeerAnswer() {
     gameState.state = 'waiting-for-first-move';
   },
   onMessage(rawMessage) {
@@ -74,6 +65,10 @@ createPeerToPeer({
     console.log(...args);
   },
 });
+
+export function sendMessage(message: Message) {
+  p2p.sendMessage(JSON.stringify(message));
+}
 
 function gameId() {
   const paramsGameId = new URLSearchParams(window.location.search).get('game');
