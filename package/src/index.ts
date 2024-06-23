@@ -18,6 +18,7 @@ export function createPeerToPeer({
   onPeerAnswer,
   onMessage,
   getRawResources,
+  debug,
 }: {
   /** eg. "wss://p2p-game-lobby.onrender.com" */
   websocketServerUrl: string;
@@ -55,6 +56,8 @@ export function createPeerToPeer({
     peerConnection: RTCPeerConnection;
     dataChannel: RTCDataChannel;
   }) => void;
+  /** debug info to be piped to the console */
+  debug?: (...args: unknown[]) => void;
 }) {
   const ws = new WebSocket(websocketServerUrl);
   const peerConnection = new RTCPeerConnection({
@@ -72,10 +75,10 @@ export function createPeerToPeer({
   });
   const channel = peerConnection.createDataChannel('lobby', { id: 0, negotiated: true });
 
-  getRawResources?.({ websocket: ws, peerConnection, dataChannel: channel });
-
   const sendMessage = (message: string) => channel.send(message);
   channel.onmessage = (e) => onMessage?.(e.data);
+
+  getRawResources?.({ websocket: ws, peerConnection, dataChannel: channel });
 
   // client doesn't initially know its own id, so we receive it in a message from the server in the `onSelfConnected` callback.
   // the sdp state is weird and needs to be set after all ice candidates have been gathered. hoping to find a better solution later.
@@ -88,7 +91,9 @@ export function createPeerToPeer({
     new Promise((resolve) => {
       if (localState.sdp) return resolve(localState.sdp);
       peerConnection.onicecandidate = ({ candidate }) => {
+        debug?.('got ice candidate', candidate);
         if (candidate || !peerConnection.localDescription) return;
+        debug?.('got local sdp', peerConnection.localDescription.sdp);
         localState.sdp = peerConnection.localDescription.sdp;
         peerConnection.onicecandidate = null;
         resolve(localState.sdp);
@@ -102,55 +107,57 @@ export function createPeerToPeer({
   };
 
   ws.onmessage = async (event) => {
-    const message = messageSchema.parse(JSON.parse(event.data));
-    console.log(message);
+    const sendWsMessage = (message: Message) => ws.send(JSON.stringify(message));
+    const wsMessage = messageSchema.parse(JSON.parse(event.data));
 
-    switch (message.kind) {
+    debug?.('received message', wsMessage);
+
+    switch (wsMessage.kind) {
       case 'self-connected': {
-        localState.id = message.id;
+        localState.id = wsMessage.id;
         return onSelfConnected?.(localState.id);
       }
       case 'connected': {
         return onPeerConnected?.({
-          peerId: message.id,
+          peerId: wsMessage.id,
           async sendOffer() {
+            debug?.('sending offer');
             await peerConnection.setLocalDescription(await peerConnection.createOffer());
+            if (!localState.sdp) debug?.('waiting for local sdp');
             const sdp = await awaitLocalSdp();
-            const offerMessage: Message = {
+            sendWsMessage({
               kind: 'peer-offer',
-              toId: message.id,
+              toId: wsMessage.id,
               fromId: localState.id,
               offer: { type: 'offer', sdp },
-            };
-            ws.send(JSON.stringify(offerMessage));
+            });
           },
         });
       }
       case 'disconnected': {
-        return onPeerDisconnected?.(message.id);
+        return onPeerDisconnected?.(wsMessage.id);
       }
       case 'peer-offer': {
-        await peerConnection.setRemoteDescription({ type: 'offer', sdp: message.offer.sdp });
+        await peerConnection.setRemoteDescription({ type: 'offer', sdp: wsMessage.offer.sdp });
         return onPeerOffer?.({
-          peerId: message.fromId,
+          peerId: wsMessage.fromId,
           async sendAnswer() {
             await peerConnection.setLocalDescription(await peerConnection.createAnswer());
             const sdp = await awaitLocalSdp();
-            const answerMessage: Message = {
+            sendWsMessage({
               kind: 'peer-answer',
-              toId: message.fromId,
+              toId: wsMessage.fromId,
               fromId: localState.id,
               answer: { type: 'answer', sdp: sdp },
-            };
-            ws.send(JSON.stringify(answerMessage));
+            });
           },
           sendMessage,
         });
       }
       case 'peer-answer': {
-        await peerConnection.setRemoteDescription({ type: 'answer', sdp: message.answer.sdp });
+        await peerConnection.setRemoteDescription({ type: 'answer', sdp: wsMessage.answer.sdp });
         return onPeerAnswer?.({
-          peerId: message.fromId,
+          peerId: wsMessage.fromId,
           channel,
           sendMessage,
         });
