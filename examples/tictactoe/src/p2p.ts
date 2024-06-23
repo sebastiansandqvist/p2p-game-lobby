@@ -2,11 +2,23 @@ import { createPeerToPeer } from '../../../package/src';
 import { gameOverLineOrState, gameState } from './state';
 import { messageSchema, type Message } from './types';
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
   // TODO: prevent the user from joining a lobby if it's full. let them spectate instead? (how to do this without requiring interaction?)
-  // onSelfJoinedLobby({ peerIds }) {},
-  async onPeerJoinedLobby({ sendOffer }) {
+  onSelfJoinedLobby({ peers }) {
+    const [peer] = peers;
+    if (!peer) return;
+    gameState.state = 'click-to-connect';
+    window.onpointerup = async () => {
+      window.onpointerup = null;
+      if (gameState.state !== 'click-to-connect') return;
+      gameState.state = 'connecting';
+      await peer.sendOffer();
+    };
+  },
+  onPeerJoinedLobby({ sendOffer }) {
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-connect';
     window.onpointerup = async () => {
@@ -14,16 +26,15 @@ const p2p = createPeerToPeer({
       if (gameState.state !== 'click-to-connect') return;
       gameState.state = 'connecting';
       await sendOffer();
-      p2p.websocket.close();
     };
   },
   async onPeerOffer({ sendAnswer }) {
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-play';
+    await wait(1000);
     await sendAnswer(); // TODO: this probably needs to be in an onclick handler too?
-    p2p.websocket.close();
     const priorClickHandler = window.onpointerup; // TODO: something more elegant than this lol
-    window.onpointerup = async () => {
+    window.onpointerup = () => {
       window.onpointerup = priorClickHandler;
       gameState.state = 'playing';
       gameState.player = 'x';

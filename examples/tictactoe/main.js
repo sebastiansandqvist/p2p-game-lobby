@@ -8004,9 +8004,23 @@ var gameId = function() {
 var randomId = function() {
   return (Math.random() * 1e5).toString().replace(".", "");
 };
+var wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 var p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
-  async onPeerJoinedLobby({ sendOffer }) {
+  onSelfJoinedLobby({ peers }) {
+    const [peer] = peers;
+    if (!peer)
+      return;
+    gameState.state = "click-to-connect";
+    window.onpointerup = async () => {
+      window.onpointerup = null;
+      if (gameState.state !== "click-to-connect")
+        return;
+      gameState.state = "connecting";
+      await peer.sendOffer();
+    };
+  },
+  onPeerJoinedLobby({ sendOffer }) {
     if (gameState.state === "playing")
       return;
     gameState.state = "click-to-connect";
@@ -8016,17 +8030,16 @@ var p2p = createPeerToPeer({
         return;
       gameState.state = "connecting";
       await sendOffer();
-      p2p.websocket.close();
     };
   },
   async onPeerOffer({ sendAnswer }) {
     if (gameState.state === "playing")
       return;
     gameState.state = "click-to-play";
+    await wait(1000);
     await sendAnswer();
-    p2p.websocket.close();
     const priorClickHandler = window.onpointerup;
-    window.onpointerup = async () => {
+    window.onpointerup = () => {
       window.onpointerup = priorClickHandler;
       gameState.state = "playing";
       gameState.player = "x";
