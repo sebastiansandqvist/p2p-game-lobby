@@ -55,6 +55,8 @@ const server = Bun.serve<{ userId: string; lobbyId: string }>({
         const messageJson = JSON.parse(rawMessage);
         const message = messageSchema.parse(messageJson);
         switch (message.kind) {
+          case 'ping':
+          case 'pong':
           case 'peer-answer':
           case 'peer-offer': {
             server.publish(message.toId, rawMessage);

@@ -7,9 +7,11 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
   // TODO: prevent the user from joining a lobby if it's full. let them spectate instead? (how to do this without requiring interaction?)
-  onSelfJoinedLobby({ peers }) {
+  async onSelfJoinedLobby({ peers }) {
     const [peer] = peers;
     if (!peer) return;
+    const result = await p2p.testWsLatency(peer.id);
+    console.log('ws latency 1', result);
     gameState.state = 'click-to-connect';
     window.onpointerup = async () => {
       window.onpointerup = null;
@@ -18,7 +20,9 @@ const p2p = createPeerToPeer({
       await peer.sendOffer();
     };
   },
-  onPeerJoinedLobby({ sendOffer }) {
+  async onPeerJoinedLobby({ sendOffer, peerId }) {
+    const result = await p2p.testWsLatency(peerId);
+    console.log('ws latency 2', result);
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-connect';
     window.onpointerup = async () => {
@@ -34,16 +38,17 @@ const p2p = createPeerToPeer({
     await wait(1000);
     await sendAnswer(); // TODO: this probably needs to be in an onclick handler too?
     const priorClickHandler = window.onpointerup; // TODO: something more elegant than this lol
-    window.onpointerup = () => {
+    window.onpointerup = async () => {
       window.onpointerup = priorClickHandler;
       gameState.state = 'playing';
       gameState.player = 'x';
       gameState.xs = [];
       gameState.os = [];
-      sendMessage({
+      const receipt = await sendMessageWithReceipt({
         kind: 'new-game',
         fromPlayer: 'x',
       });
+      console.log(receipt);
     };
   },
   onPeerAnswer() {
@@ -83,6 +88,10 @@ const p2p = createPeerToPeer({
 
 export function sendMessage(message: Message) {
   p2p.sendMessage(JSON.stringify(message));
+}
+
+export async function sendMessageWithReceipt(message: Message) {
+  return await p2p.sendMessageWithReceipt(JSON.stringify(message));
 }
 
 function gameId() {

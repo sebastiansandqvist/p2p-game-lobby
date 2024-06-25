@@ -3956,12 +3956,44 @@ var peerAnswerMessageSchema = z.object({
   fromId: z.string(),
   answer: webRtcOfferSchema
 });
+var pingSchema = z.object({
+  kind: z.literal("ping"),
+  toId: z.string(),
+  fromId: z.string()
+});
+var pongSchema = z.object({
+  kind: z.literal("pong"),
+  toId: z.string(),
+  fromId: z.string()
+});
 var messageSchema = z.union([
   selfConnectionMessageSchema,
   connectionMessageSchema,
   disconnectionMessageSchema,
   peerOfferMessageSchema,
-  peerAnswerMessageSchema
+  peerAnswerMessageSchema,
+  pingSchema,
+  pongSchema
+]);
+var p2pMessageRequestingReceiptSchema = z.object({
+  kind: z.literal("message-requesting-receipt"),
+  id: z.string(),
+  message: z.string(),
+  sentAt: z.number(),
+  start: z.number()
+});
+var p2pMessageReceiptSchema = z.object({
+  kind: z.literal("message-receipt"),
+  id: z.string()
+});
+var p2pPlainMessageSchema = z.object({
+  kind: z.literal("message"),
+  message: z.string()
+});
+var p2pMessageSchema = z.union([
+  p2pPlainMessageSchema,
+  p2pMessageRequestingReceiptSchema,
+  p2pMessageReceiptSchema
 ]);
 
 // ../../package/src/index.ts
@@ -3993,41 +4025,116 @@ function createPeerToPeer({
   const channel = peerConnection.createDataChannel("lobby", { id: 0, negotiated: true });
   const sendMessage = (message) => {
     debug?.("sending message", message);
-    channel.send(message);
+    const formattedMessage = { kind: "message", message };
+    channel.send(JSON.stringify(formattedMessage));
+  };
+  const sendReceipt = (id) => {
+    debug?.("sending receipt", id);
+    const formattedMessage = { kind: "message-receipt", id };
+    channel.send(JSON.stringify(formattedMessage));
   };
   channel.onmessage = (e) => {
     debug?.("got message", e.data);
-    onMessage?.(e.data);
+    try {
+      const message = p2pMessageSchema.parse(JSON.parse(e.data));
+      switch (message.kind) {
+        case "message": {
+          return onMessage?.(message.message);
+        }
+        case "message-requesting-receipt": {
+          sendReceipt(message.id);
+          return onMessage?.(message.message);
+        }
+        case "message-receipt": {
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
+  function sendMessageWithReceipt(message, timeoutMs = 1000) {
+    return new Promise((resolve, reject) => {
+      const id = crypto.randomUUID();
+      const sentAt = Date.now();
+      const start = performance.now();
+      const formattedMessage = { kind: "message-requesting-receipt", id, message, sentAt, start };
+      channel.send(JSON.stringify(formattedMessage));
+      const timeout = setTimeout(() => {
+        channel.removeEventListener("message", receiptHandler);
+        reject(new Error("Timeout"));
+      }, timeoutMs);
+      const receiptHandler = (event) => {
+        try {
+          const receipt = p2pMessageReceiptSchema.parse(JSON.parse(event.data));
+          if (receipt.id !== id)
+            return;
+          clearTimeout(timeout);
+          channel.removeEventListener("message", receiptHandler);
+          resolve({ roundTripTime: performance.now() - start });
+        } catch (err) {
+        }
+      };
+      channel.addEventListener("message", receiptHandler);
+    });
+  }
   getRawResources?.({ websocket: ws, peerConnection, dataChannel: channel });
   const localState = {
     id: "",
     sdp: ""
   };
-  const awaitLocalSdp = () => new Promise((resolve) => {
-    if (localState.sdp)
-      return resolve(localState.sdp);
-    peerConnection.onicecandidate = ({ candidate }) => {
-      debug?.("got ice candidate", candidate);
-      if (candidate || !peerConnection.localDescription)
-        return;
-      debug?.("got local sdp", peerConnection.localDescription.sdp);
-      localState.sdp = peerConnection.localDescription.sdp;
-      peerConnection.onicecandidate = null;
-      resolve(localState.sdp);
-    };
-  });
+  function awaitLocalSdp() {
+    return new Promise((resolve) => {
+      if (localState.sdp)
+        return resolve(localState.sdp);
+      peerConnection.onicecandidate = ({ candidate }) => {
+        debug?.("got ice candidate", candidate);
+        if (candidate || !peerConnection.localDescription)
+          return;
+        debug?.("got local sdp", peerConnection.localDescription.sdp);
+        localState.sdp = peerConnection.localDescription.sdp;
+        peerConnection.onicecandidate = null;
+        resolve(localState.sdp);
+      };
+    });
+  }
   peerConnection.onicecandidate = ({ candidate }) => {
     if (candidate || !peerConnection.localDescription)
       return;
     localState.sdp = peerConnection.localDescription.sdp;
     peerConnection.onicecandidate = null;
   };
+  function testWsLatency(toId, timeoutMs = 1000) {
+    return new Promise((resolve, reject) => {
+      const message = { kind: "ping", toId, fromId: localState.id };
+      const start = performance.now();
+      ws.send(JSON.stringify(message));
+      const timeout = setTimeout(() => {
+        ws.removeEventListener("message", wsLatencyHandler);
+        reject(new Error("Timeout"));
+      }, timeoutMs);
+      const wsLatencyHandler = (event) => {
+        const wsMessage = messageSchema.parse(JSON.parse(event.data));
+        if (wsMessage.kind !== "pong")
+          return;
+        resolve({ roundTripTime: performance.now() - start });
+        ws.removeEventListener("message", wsLatencyHandler);
+        clearTimeout(timeout);
+      };
+      ws.addEventListener("message", wsLatencyHandler);
+    });
+  }
   ws.onmessage = async (event) => {
     const sendWsMessage = (message) => ws.send(JSON.stringify(message));
     const wsMessage = messageSchema.parse(JSON.parse(event.data));
     debug?.("received message", wsMessage);
     switch (wsMessage.kind) {
+      case "ping": {
+        sendWsMessage({ kind: "pong", toId: wsMessage.fromId, fromId: wsMessage.toId });
+        return;
+      }
+      case "pong": {
+        return;
+      }
       case "self-connected": {
         localState.id = wsMessage.id;
         return onSelfJoinedLobby?.({
@@ -4103,9 +4210,11 @@ function createPeerToPeer({
   };
   return {
     sendMessage,
+    sendMessageWithReceipt,
     websocket: ws,
     channel,
     peerConnection,
+    testWsLatency,
     cleanup() {
       ws.close();
       channel.close();
@@ -7990,8 +8099,8 @@ var move = z2.object({
 var messageSchema2 = z2.union([newGame, move]);
 
 // src/p2p.ts
-function sendMessage(message) {
-  p2p.sendMessage(JSON.stringify(message));
+async function sendMessageWithReceipt(message) {
+  return await p2p.sendMessageWithReceipt(JSON.stringify(message));
 }
 var gameId = function() {
   const paramsGameId = new URLSearchParams(window.location.search).get("game");
@@ -8007,10 +8116,12 @@ var randomId = function() {
 var wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 var p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
-  onSelfJoinedLobby({ peers }) {
+  async onSelfJoinedLobby({ peers }) {
     const [peer] = peers;
     if (!peer)
       return;
+    const result = await p2p.testWsLatency(peer.id);
+    console.log("ws latency 1", result);
     gameState.state = "click-to-connect";
     window.onpointerup = async () => {
       window.onpointerup = null;
@@ -8020,7 +8131,9 @@ var p2p = createPeerToPeer({
       await peer.sendOffer();
     };
   },
-  onPeerJoinedLobby({ sendOffer }) {
+  async onPeerJoinedLobby({ sendOffer, peerId }) {
+    const result = await p2p.testWsLatency(peerId);
+    console.log("ws latency 2", result);
     if (gameState.state === "playing")
       return;
     gameState.state = "click-to-connect";
@@ -8039,16 +8152,17 @@ var p2p = createPeerToPeer({
     await wait(1000);
     await sendAnswer();
     const priorClickHandler = window.onpointerup;
-    window.onpointerup = () => {
+    window.onpointerup = async () => {
       window.onpointerup = priorClickHandler;
       gameState.state = "playing";
       gameState.player = "x";
       gameState.xs = [];
       gameState.os = [];
-      sendMessage({
+      const receipt = await sendMessageWithReceipt({
         kind: "new-game",
         fromPlayer: "x"
       });
+      console.log(receipt);
     };
   },
   onPeerAnswer() {
@@ -8132,18 +8246,18 @@ function drawGame(ctx, canvasRect) {
         gameState.mouseClickCoords = null;
         gameState.xs = [];
         gameState.os = [];
-        sendMessage({
+        sendMessageWithReceipt({
           kind: "new-game",
           fromPlayer: gameState.player
-        });
+        }).then((receipt) => console.log(receipt)).catch((err) => console.error(err));
       }, 1000);
     }
-    sendMessage({
+    sendMessageWithReceipt({
       kind: "move",
       fromPlayer: gameState.player,
       col: cell.col,
       row: cell.row
-    });
+    }).then((receipt) => console.log(receipt)).catch((err) => console.error(err));
   }
 }
 function getCellUnderMouse(mouse, boardRect) {

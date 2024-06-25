@@ -1,4 +1,4 @@
-import { sendMessage } from './p2p';
+import { sendMessageWithReceipt } from './p2p';
 import { gameState, gameOverLineOrState } from './state';
 
 const gameStateMessages = {
@@ -70,19 +70,23 @@ export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
         gameState.mouseClickCoords = null;
         gameState.xs = [];
         gameState.os = [];
-        sendMessage({
+        sendMessageWithReceipt({
           kind: 'new-game',
           fromPlayer: gameState.player,
-        });
+        })
+          .then((receipt) => console.log(receipt))
+          .catch((err) => console.error(err));
       }, 1000);
     }
 
-    sendMessage({
+    sendMessageWithReceipt({
       kind: 'move',
       fromPlayer: gameState.player,
       col: cell.col,
       row: cell.row,
-    });
+    })
+      .then((receipt) => console.log(receipt))
+      .catch((err) => console.error(err));
   }
 }
 

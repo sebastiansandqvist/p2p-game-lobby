@@ -1,7 +1,4 @@
-import { messageSchema, type Message } from './types';
-
-// TODO: add a latency test. some debug info to show roundtrip time
-// (for both the ws and p2p connections.)
+import { messageSchema, p2pMessageReceiptSchema, p2pMessageSchema, type Message, type P2pMessage } from './types';
 
 /** `createPeerToPeer`
   1. creates an immediate websocket connection to a server at websocketServerUrl,
@@ -84,12 +81,62 @@ export function createPeerToPeer({
 
   const sendMessage = (message: string) => {
     debug?.('sending message', message);
-    channel.send(message);
+    const formattedMessage: P2pMessage = { kind: 'message', message };
+    channel.send(JSON.stringify(formattedMessage));
   };
+
+  const sendReceipt = (id: string) => {
+    debug?.('sending receipt', id);
+    const formattedMessage: P2pMessage = { kind: 'message-receipt', id };
+    channel.send(JSON.stringify(formattedMessage));
+  };
+
   channel.onmessage = (e) => {
     debug?.('got message', e.data);
-    onMessage?.(e.data);
+    try {
+      const message = p2pMessageSchema.parse(JSON.parse(e.data));
+      switch (message.kind) {
+        case 'message': {
+          return onMessage?.(message.message);
+        }
+        case 'message-requesting-receipt': {
+          sendReceipt(message.id);
+          return onMessage?.(message.message);
+        }
+        case 'message-receipt': {
+          // ignore here. will be handled in the receiptHandler.
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
+
+  function sendMessageWithReceipt(message: string, timeoutMs = 1000) {
+    return new Promise((resolve, reject) => {
+      const id = crypto.randomUUID();
+      const sentAt = Date.now();
+      const start = performance.now();
+      const formattedMessage: P2pMessage = { kind: 'message-requesting-receipt', id, message, sentAt, start };
+      channel.send(JSON.stringify(formattedMessage));
+      const timeout = setTimeout(() => {
+        channel.removeEventListener('message', receiptHandler);
+        reject(new Error('Timeout'));
+      }, timeoutMs);
+      const receiptHandler = (event: MessageEvent) => {
+        try {
+          const receipt = p2pMessageReceiptSchema.parse(JSON.parse(event.data));
+          if (receipt.id !== id) return;
+          clearTimeout(timeout);
+          channel.removeEventListener('message', receiptHandler);
+          resolve({ roundTripTime: performance.now() - start });
+        } catch (err) {
+          /* do nothing */
+        }
+      };
+      channel.addEventListener('message', receiptHandler);
+    });
+  }
 
   getRawResources?.({ websocket: ws, peerConnection, dataChannel: channel });
 
@@ -100,8 +147,8 @@ export function createPeerToPeer({
     sdp: '',
   };
 
-  const awaitLocalSdp = (): Promise<string> =>
-    new Promise((resolve) => {
+  function awaitLocalSdp(): Promise<string> {
+    return new Promise((resolve) => {
       if (localState.sdp) return resolve(localState.sdp);
       peerConnection.onicecandidate = ({ candidate }) => {
         debug?.('got ice candidate', candidate);
@@ -112,12 +159,34 @@ export function createPeerToPeer({
         resolve(localState.sdp);
       };
     });
+  }
 
   peerConnection.onicecandidate = ({ candidate }) => {
     if (candidate || !peerConnection.localDescription) return;
     localState.sdp = peerConnection.localDescription.sdp;
     peerConnection.onicecandidate = null;
   };
+
+  /** see how long it takes to transmit a message over websocket */
+  function testWsLatency(toId: string, timeoutMs = 1000) {
+    return new Promise((resolve, reject) => {
+      const message: Message = { kind: 'ping', toId, fromId: localState.id };
+      const start = performance.now();
+      ws.send(JSON.stringify(message));
+      const timeout = setTimeout(() => {
+        ws.removeEventListener('message', wsLatencyHandler);
+        reject(new Error('Timeout'));
+      }, timeoutMs);
+      const wsLatencyHandler = (event: MessageEvent) => {
+        const wsMessage = messageSchema.parse(JSON.parse(event.data));
+        if (wsMessage.kind !== 'pong') return;
+        resolve({ roundTripTime: performance.now() - start });
+        ws.removeEventListener('message', wsLatencyHandler);
+        clearTimeout(timeout);
+      };
+      ws.addEventListener('message', wsLatencyHandler);
+    });
+  }
 
   ws.onmessage = async (event) => {
     const sendWsMessage = (message: Message) => ws.send(JSON.stringify(message));
@@ -126,6 +195,14 @@ export function createPeerToPeer({
     debug?.('received message', wsMessage);
 
     switch (wsMessage.kind) {
+      case 'ping': {
+        sendWsMessage({ kind: 'pong', toId: wsMessage.fromId, fromId: wsMessage.toId });
+        return;
+      }
+      case 'pong': {
+        // ignore pongs here, they're handled in testWsLatency instead
+        return;
+      }
       case 'self-connected': {
         localState.id = wsMessage.id;
         return onSelfJoinedLobby?.({
@@ -171,6 +248,8 @@ export function createPeerToPeer({
         await peerConnection.setRemoteDescription({ type: 'offer', sdp: wsMessage.offer.sdp });
         return onPeerOffer?.({
           peerId: wsMessage.fromId,
+          // TODO:
+          // async rejectOffer() {},
           async sendAnswer() {
             await peerConnection.setLocalDescription(await peerConnection.createAnswer());
             const sdp = await awaitLocalSdp();
@@ -201,9 +280,11 @@ export function createPeerToPeer({
   return {
     /** `sendMessage` will throw an error if the peer connection is not properly established */
     sendMessage,
+    sendMessageWithReceipt,
     websocket: ws,
     channel,
     peerConnection,
+    testWsLatency,
     cleanup() {
       ws.close();
       channel.close();
