@@ -112,7 +112,7 @@ export function createPeerToPeer({
     }
   };
 
-  function sendMessageWithReceipt(message: string, timeoutMs = 1000) {
+  function sendMessageWithReceipt(message: string, timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
       const id = crypto.randomUUID();
       const sentAt = Date.now();
@@ -168,7 +168,7 @@ export function createPeerToPeer({
   };
 
   /** see how long it takes to transmit a message over websocket */
-  function testWsLatency(toId: string, timeoutMs = 1000) {
+  function testWsLatency(toId: string, timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
       const message: Message = { kind: 'ping', toId, fromId: localState.id };
       const start = performance.now();

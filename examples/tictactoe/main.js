@@ -4052,7 +4052,7 @@ function createPeerToPeer({
       console.error(err);
     }
   };
-  function sendMessageWithReceipt(message, timeoutMs = 1000) {
+  function sendMessageWithReceipt(message, timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
       const id = crypto.randomUUID();
       const sentAt = Date.now();
@@ -4103,7 +4103,7 @@ function createPeerToPeer({
     localState.sdp = peerConnection.localDescription.sdp;
     peerConnection.onicecandidate = null;
   };
-  function testWsLatency(toId, timeoutMs = 1000) {
+  function testWsLatency(toId, timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
       const message = { kind: "ping", toId, fromId: localState.id };
       const start = performance.now();
