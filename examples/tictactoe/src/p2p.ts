@@ -101,5 +101,5 @@ function gameId() {
 }
 
 function randomId() {
-  return (Math.random() * 100_000).toString().replace('.', '').slice(0, 6);
+  return (Math.random() * 100_000).toString(32).replace('.', '').slice(0, 6);
 }
