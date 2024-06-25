@@ -46,6 +46,14 @@ export const peerAnswerMessageSchema = z.object({
 
 export type PeerAnswerMessage = z.infer<typeof peerAnswerMessageSchema>;
 
+export const peerRejectOfferMessageSchema = z.object({
+  kind: z.literal('peer-reject-offer'),
+  toId: z.string(),
+  fromId: z.string(),
+});
+
+export type PeerRejectOfferMessage = z.infer<typeof peerRejectOfferMessageSchema>;
+
 export const pingSchema = z.object({
   kind: z.literal('ping'),
   toId: z.string(),
@@ -68,6 +76,7 @@ export const messageSchema = z.union([
   disconnectionMessageSchema,
   peerOfferMessageSchema,
   peerAnswerMessageSchema,
+  peerRejectOfferMessageSchema,
   pingSchema,
   pongSchema,
 ]);

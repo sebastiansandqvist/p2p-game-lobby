@@ -2,7 +2,7 @@ import { createPeerToPeer } from '../../../package/src';
 import { gameOverLineOrState, gameState } from './state';
 import { messageSchema, type Message } from './types';
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const p2p = createPeerToPeer({
   websocketServerUrl: `wss://p2p-game-lobby.onrender.com/tictactoe/${gameId()}`,
@@ -10,8 +10,6 @@ const p2p = createPeerToPeer({
   async onSelfJoinedLobby({ peers }) {
     const [peer] = peers;
     if (!peer) return;
-    const result = await p2p.testWsLatency(peer.id);
-    console.log('ws latency 1', result);
     gameState.state = 'click-to-connect';
     window.onpointerup = async () => {
       window.onpointerup = null;
@@ -20,9 +18,7 @@ const p2p = createPeerToPeer({
       await peer.sendOffer();
     };
   },
-  async onPeerJoinedLobby({ sendOffer, peerId }) {
-    const result = await p2p.testWsLatency(peerId);
-    console.log('ws latency 2', result);
+  async onPeerJoinedLobby({ sendOffer }) {
     if (gameState.state === 'playing') return;
     gameState.state = 'click-to-connect';
     window.onpointerup = async () => {
@@ -32,11 +28,14 @@ const p2p = createPeerToPeer({
       await sendOffer();
     };
   },
-  async onPeerOffer({ sendAnswer }) {
-    if (gameState.state === 'playing') return;
+  async onPeerOffer({ sendAnswer, rejectOffer }) {
+    if (gameState.state === 'playing') {
+      rejectOffer();
+      return;
+    }
+
     gameState.state = 'click-to-play';
-    await wait(1000);
-    await sendAnswer(); // TODO: this probably needs to be in an onclick handler too?
+    await sendAnswer();
     const priorClickHandler = window.onpointerup; // TODO: something more elegant than this lol
     window.onpointerup = async () => {
       window.onpointerup = priorClickHandler;
@@ -53,6 +52,9 @@ const p2p = createPeerToPeer({
   },
   onPeerAnswer() {
     gameState.state = 'waiting-for-first-move';
+  },
+  onPeerRejectedOffer() {
+    gameState.state = 'busy';
   },
   onMessage(rawMessage) {
     const message = messageSchema.parse(JSON.parse(rawMessage));
@@ -85,10 +87,6 @@ const p2p = createPeerToPeer({
     console.log(...args);
   },
 });
-
-export function sendMessage(message: Message) {
-  p2p.sendMessage(JSON.stringify(message));
-}
 
 export async function sendMessageWithReceipt(message: Message) {
   return await p2p.sendMessageWithReceipt(JSON.stringify(message));

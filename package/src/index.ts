@@ -14,6 +14,7 @@ export function createPeerToPeer({
   onPeerLeftLobby,
   onPeerOffer,
   onPeerAnswer,
+  onPeerRejectedOffer,
   onMessage,
   getRawResources,
   debug,
@@ -39,6 +40,7 @@ export function createPeerToPeer({
     sendMessage,
   }: {
     peerId: string;
+    rejectOffer: () => void;
     sendAnswer: () => Promise<void>;
     sendMessage: (message: string) => void;
   }) => void;
@@ -52,6 +54,8 @@ export function createPeerToPeer({
     channel: RTCDataChannel;
     sendMessage: (message: string) => void;
   }) => void;
+  /** called when another user has rejected an p2p connection offer that you sent */
+  onPeerRejectedOffer?: ({ fromId }: { fromId: string }) => void;
   /** called when another user who you are connected to p2p sends a message to you */
   onMessage?: (message: string) => void;
   /** if this API is missing anything, use the underlying resources to do it yourself */
@@ -113,7 +117,7 @@ export function createPeerToPeer({
   };
 
   function sendMessageWithReceipt(message: string, timeoutMs = 5000) {
-    return new Promise((resolve, reject) => {
+    return new Promise<{ roundTripTime: number }>((resolve, reject) => {
       const id = crypto.randomUUID();
       const sentAt = Date.now();
       const start = performance.now();
@@ -245,12 +249,17 @@ export function createPeerToPeer({
         return onPeerLeftLobby?.(wsMessage.id);
       }
       case 'peer-offer': {
-        await peerConnection.setRemoteDescription({ type: 'offer', sdp: wsMessage.offer.sdp });
         return onPeerOffer?.({
           peerId: wsMessage.fromId,
-          // TODO:
-          // async rejectOffer() {},
+          rejectOffer() {
+            sendWsMessage({
+              kind: 'peer-reject-offer',
+              toId: wsMessage.fromId,
+              fromId: localState.id,
+            });
+          },
           async sendAnswer() {
+            await peerConnection.setRemoteDescription({ type: 'offer', sdp: wsMessage.offer.sdp });
             await peerConnection.setLocalDescription(await peerConnection.createAnswer());
             const sdp = await awaitLocalSdp();
             sendWsMessage({
@@ -261,6 +270,11 @@ export function createPeerToPeer({
             });
           },
           sendMessage,
+        });
+      }
+      case 'peer-reject-offer': {
+        return onPeerRejectedOffer?.({
+          fromId: wsMessage.fromId,
         });
       }
       case 'peer-answer': {

@@ -58,7 +58,8 @@ const server = Bun.serve<{ userId: string; lobbyId: string }>({
           case 'ping':
           case 'pong':
           case 'peer-answer':
-          case 'peer-offer': {
+          case 'peer-offer':
+          case 'peer-reject-offer': {
             server.publish(message.toId, rawMessage);
             return;
           }
