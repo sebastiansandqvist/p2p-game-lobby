@@ -9,6 +9,7 @@ const gameStateMessages = {
   'connecting': 'Connecting...',
   'playing': '',
   'gameover': 'Draw!', // we'll only display this gameover state if there is no winning line
+  'busy': 'A game is already in progress. click to create a new lobby',
 };
 
 export function drawGame(ctx: CanvasRenderingContext2D, canvasRect: DOMRect) {
