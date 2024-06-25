@@ -101,5 +101,7 @@ function gameId() {
 }
 
 function randomId() {
-  return (Math.random() * 100_000).toString(32).replace('.', '').slice(0, 6);
+  // no O, 0, 1, l, or I
+  const alphabet = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
 }
