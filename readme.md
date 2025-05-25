@@ -1,5 +1,7 @@
 # peer-to-peer communication
 
+this is a proof-of-concept client and server implementation of a peer-to-peer game lobby system using webrtc. the server facilitates the peers' initial handshakes. then once a data channel is established between the peers, no further data needs to hit the server.
+
 ## setup
 
 ```bash
@@ -8,7 +10,78 @@ bun run dev:server # localhost:3333
 bun run dev:client # open client/index.html, no dev server
 ```
 
+## usage
+
+for complete, runnable examples see [these](/examples). here's a simplified example p2p chat application:
+
+```ts
+// client.ts
+import { createPeerToPeer } from './package';
+
+const p2p = createPeerToPeer({
+  websocketServerUrl: 'ws://localhost:3333/chat-room',
+
+  // called when you successfully join the lobby
+  onSelfJoinedLobby({ selfId, peers }) {
+    console.log(`connected as ${selfId}`);
+    console.log(`${peers.length} other users in lobby`);
+  },
+
+  // called when another user joins the lobby
+  async onPeerJoinedLobby({ peerId, sendOffer }) {
+    console.log(`${peerId} joined the lobby`);
+
+    // send connection offer to new peers
+    if (confirm(`connect to peer ${peerId}?`)) {
+      await sendOffer();
+    }
+  },
+
+  // called when another user wants to connect to you
+  async onPeerOffer({ peerId, sendAnswer, rejectOffer }) {
+    console.log(`${peerId} wants to connect`);
+
+    // accept the connection
+    if (confirm(`accept peer request from ${peerId}?`)) {
+      await sendAnswer();
+      console.log(`connected to ${peerId}!`);
+    }
+  },
+
+  // called when your connection offer is accepted
+  onPeerAnswer({ peerId, sendMessage }) {
+    console.log(`connected to ${peerId}!`);
+
+    // send a welcome message
+    sendMessage('hello! we are now connected p2p');
+  },
+
+  // called when you receive a p2p message
+  onMessage(message) {
+    console.log(`peer: ${message}`);
+  },
+
+  // called when a peer leaves the lobby
+  onPeerLeftLobby(peerId) {
+    console.log(`${peerId} disconnected`);
+  },
+});
+
+// send a simple message
+function sendChatMessage(text) {
+  p2p.sendMessage(text);
+}
+
+// send a message with delivery confirmation
+async function sendImportantMessage(text) {
+  const { roundTripTime } = await p2p.sendMessageWithReceipt(text);
+  console.log(`message delivered in ${roundTripTime}ms`);
+}
+```
+
 ## how this p2p lobby works
+
+details about the implementation:
 
 1. when loading the page, the client creates a websocket connection to the server. this connection is NOT used to communicate data--only to establish a p2p connection with another client.
 
@@ -99,7 +172,7 @@ ws.send(
 await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
 ```
 
-The two users are now connected and can communicate directly via WebRTC without hitting the server. (They could even both disconnect from it at this point and still communicate with one another.)
+the two users are now connected and can communicate directly via WebRTC without hitting the server. (they could even both disconnect from it at this point and still communicate with one another.)
 
 ## how to send data between two peers
 
